@@ -1,5 +1,5 @@
 /**
- * FX Studio 配置表单（声明式，工作台据此自动生成表单）。
+ * SAI2 特效工坊 配置表单（声明式，工作台据此自动生成表单）。
  * 默认使用随插件一起分发的上游套件；只有需要换成其他版本时才让用户改路径。
  */
 'use strict'
@@ -16,7 +16,7 @@ module.exports = {
     type: 'bool',
     label: '打开浮窗时自动注入',
     default: true,
-    hint: '默认开启：打开 FX Studio 会运行随包的 sai2_injector.exe inject（权限需与 SAI2 一致；首次可能需加杀软白名单）。'
+    hint: '默认开启：打开特效工坊会运行随包的 sai2_injector.exe inject（权限需与 SAI2 一致；首次可能需加杀软白名单）。'
   },
   autoPaste: {
     type: 'bool',

@@ -54,7 +54,7 @@ async function main() {
   const suiteAction = toolbar.find((a) => a.id === 'suite-open')
   const lightAction = toolbar.find((a) => a.id === 'fx-open')
   assert.ok(suiteAction, '缺少工具栏动作：SAI2 工具面板')
-  assert.ok(lightAction, '缺少工具栏动作：FX Studio 轻量版')
+  assert.ok(lightAction, '缺少工具栏动作：特效工坊（浮窗）')
   assert.equal(suiteAction.label, 'SAI2 工具面板')
 
   lightAction.run()

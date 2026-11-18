@@ -1,5 +1,5 @@
 /**
- * SAI2 FX Studio —— sai2工作台非官方插件入口。
+ * SAI2 特效工坊（SAI2 FX Studio）—— sai2工作台官方功能插件入口。
  *
  * 装配：命名管道 agent + 核心引擎 + 移植算法 + 剪贴板/桌面桥 + 浮窗。
  * 全部逻辑在主进程（CJS），浮窗只发消息，不碰 Node。
@@ -166,7 +166,7 @@ function apply(ctx, config) {
       const layers = r.ok ? r.rows : []
       post({ type: 'layers', ok: r.ok, layers })
       if (!r.ok) ctx.setStatus('未连接注入器（点「连接注入」或检查白名单）', 'warn')
-      else ctx.setStatus('FX Studio 就绪', 'ok')
+      else ctx.setStatus('SAI2 特效工坊就绪', 'ok')
       return layers
     } catch (err) {
       post({ type: 'layers', ok: false, layers: [] })
@@ -479,7 +479,7 @@ function apply(ctx, config) {
     if (!fs.existsSync(entry)) { ctx.dialog.error('找不到浮窗界面文件：' + entry); return }
     const r = ctx.windows.open({
       entry: 'ui/panel.html',
-      title: 'SAI2 FX Studio',
+      title: 'SAI2 特效工坊',
       width: 1000,
       height: 680,
       onMessage: handleWindowMessage
@@ -712,7 +712,7 @@ function apply(ctx, config) {
   const managePage = manageHtml()
   if (managePage) {
     if (typeof ctx.addPage === 'function') {
-      ctx.addPage({ id: MANAGE_PAGE_ID, title: 'FX Studio', html: managePage })
+      ctx.addPage({ id: MANAGE_PAGE_ID, title: '特效工坊', html: managePage })
     } else {
       ctx.setStatus('当前工作台版本不支持插件页面，请升级 sai2工作台', 'warn')
     }
@@ -725,7 +725,7 @@ function apply(ctx, config) {
   })
   ctx.addToolbarAction({
     id: 'fx-open',
-    label: 'FX Studio 轻量版',
+    label: '特效工坊（浮窗）',
     run: () => openWindow()
   })
   // 管理面板用的动作：页面按钮发的 id 必须与这里完全一致（tests/manage-panel.test.js 校验）
@@ -757,7 +757,7 @@ function apply(ctx, config) {
   })
   ctx.addFileAction({
     id: 'fx-open-file',
-    label: '用 FX Studio 处理',
+    label: '用特效工坊处理',
     exts: ['.sai2', '.psd', '.png', '.jpg', '.jpeg', '.webp'],
     run: (payload) => {
       const file = typeof payload === 'string' ? payload : (payload && payload.path)
