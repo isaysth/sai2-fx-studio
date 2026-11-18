@@ -1,6 +1,6 @@
 # SAI2 FX Studio（官方功能插件 · 独立项目）
 
-> 本项目是 sai2工作台 生态下的独立插件项目：`C:\Users\11421\Documents\sai2工作台\sai2-fx-studio\`。
+> 本项目是 sai2工作台 生态下的独立插件项目，位于容器父目录下的 `sai2-fx-studio\`（独立 git 仓库）。
 > 工作台仓库只保留插件 API；本插件的源码、文档、构建与发版全部在这里完成。
 
 为 [sai2工作台](https://github.com/isaysth/sai2-workbench) 提供**原创 UI 层 + 原创 JS 引擎**的 SAI2 图像工具插件，直接对接当前图层。v0.3.0 按原开发方案补齐：四功能页、选区、历史、统计、Lab 取色器、三角色盘、渐变换色、动作、外观设置全部在插件自己的 UI/引擎里实现。
@@ -82,7 +82,7 @@
 ## 开发 / 构建（独立项目）
 
 ```bash
-cd C:\Users\11421\Documents\sai2工作台\sai2-fx-studio
+cd sai2-fx-studio
 npm test          # 核心工具 18 项 + 算法 39 项 + 装配/消息路由冒烟测试
 npm run build     # 生成 dist/sai2-fx-studio-<version>.zip
 ```
