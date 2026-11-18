@@ -71,10 +71,25 @@ Start-Sleep -Milliseconds 150
 if ([Focus]::GetForegroundWindow() -eq $h) { Write-Output "OK" } else { Write-Output "FAILED" }
 `
 
+/**
+ * 拼 -Command 的内容。
+ *
+ * 坑：`-Command <脚本> <参数...>` 里，`-Command` 之后的内容会被整段当成**脚本文本**，
+ * 位置参数不会绑定到脚本的 `param()`，而是被拼在最后一行 →
+ * 报「表达式或语句中包含意外的标记」。实测：`param([int]$X,[int]$Y)` + `2212 1371`
+ * 得到 `行:16 字符:7 ... + 2212 1371`，退出码 1。
+ *
+ * 解法：把脚本包成 `& { ... }`，参数跟在花括号后面，就是一次正常的脚本块调用。
+ * 抓图（Ctrl+A/C）与贴回（Ctrl+V）都走这条路，这里错一次整条链路全挂。
+ */
+function buildCommand(script, args) {
+  return args && args.length > 0 ? `& {${script}}` : script
+}
+
 function run(script, args, opts = {}) {
   return new Promise((resolve, reject) => {
     if (opts.exec) return opts.exec(script, args, resolve, reject)
-    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script, ...args], {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', buildCommand(script, args), ...(args || [])], {
       stdio: ['ignore', 'pipe', 'pipe']
     })
     let out = '', err = ''
@@ -187,6 +202,6 @@ function runInjector(injectorExe, action = 'inject') {
 }
 
 module.exports = {
-  focusSai2, ctrl, grabLayer, pasteBack, clickAt, runInjector, runElevated, run,
+  focusSai2, ctrl, grabLayer, pasteBack, clickAt, runInjector, runElevated, run, buildCommand,
   KEY_PS, FOCUS_PS, CLICK_PS, ELEVATE_PS
 }

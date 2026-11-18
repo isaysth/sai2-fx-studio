@@ -54,8 +54,10 @@ function runElevated(exe, cwd) {
       resolve({ ok: false, error: `找不到 ${exe}` })
       return
     }
+    // `-Command <脚本> <参数>` 会把参数拼进脚本文本、绑不到 param()，必须包成 & { }
+    // （与 core/desktop.js 的 buildCommand 同一个坑，改一处漏一处就是这个后果）
     const ps = spawn('powershell.exe', [
-      '-NoProfile', '-NonInteractive', '-Command', ELEVATE_PS, exe, cwd
+      '-NoProfile', '-NonInteractive', '-Command', `& {${ELEVATE_PS}}`, exe, cwd
     ], { stdio: ['ignore', 'pipe', 'pipe'] })
     let err = ''
     ps.stderr.on('data', (c) => { err += c.toString() })
