@@ -1,10 +1,10 @@
 {
   "name": "sai2-fx-studio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "SAI2 FX Studio - sai2工作台非官方插件（独立项目）",
   "scripts": {
-    "test": "node tests/smoke.js",
+    "test": "node tests/core-tools.test.js && node tests/algorithms.test.js && node tests/smoke.js",
     "build": "node scripts/build.js"
   }
 }

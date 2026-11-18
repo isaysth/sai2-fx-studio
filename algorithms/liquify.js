@@ -64,7 +64,7 @@ class LiquifySession {
     this.strokeCount += 1
   }
 
-  /** 旋转（顺时针） */
+  /** 旋转（顺时针，屏幕坐标系下正角度为顺时针） */
   swirl(cx, cy, radius, angle = 0.5) {
     this._stamp(cx, cy, radius, (px, py, falloff) => {
       const vx = px - cx
@@ -75,6 +75,65 @@ class LiquifySession {
       this._add(px, py, nx - vx, ny - vy)
     })
     this.strokeCount += 1
+  }
+
+  /** 复原：笔刷范围内把位移场按比例衰减回 0 */
+  reconstruct(cx, cy, radius, amount = 1) {
+    const a = Math.max(0, amount)
+    this._stamp(cx, cy, radius, (px, py, falloff) => {
+      const i = (py * this.width + px) * 2
+      const factor = Math.max(0, 1 - a * falloff)
+      this.field[i] *= factor
+      this.field[i + 1] *= factor
+    })
+    this.strokeCount += 1
+  }
+
+  /** 顺时针旋转：swirl 的正向封装 */
+  clockwise(cx, cy, radius, angle = 0.5) {
+    this.swirl(cx, cy, radius, Math.abs(angle))
+  }
+
+  /** 逆时针旋转：swirl 的反向封装 */
+  counterclockwise(cx, cy, radius, angle = 0.5) {
+    this.swirl(cx, cy, radius, -Math.abs(angle))
+  }
+
+  /** 收缩：沿径向向内推移（inflate 的负向） */
+  pinch(cx, cy, radius, amount = 1) {
+    this.inflate(cx, cy, radius, -Math.abs(amount))
+  }
+
+  /** 向左推：向前变形并叠加一个固定的左向偏置 */
+  pushLeft(fromX, fromY, toX, toY, radius, strength = 1) {
+    const dx = toX - fromX
+    const dy = toY - fromY
+    const s = strength
+    this._stamp(toX, toY, radius, (px, py, falloff) => {
+      this._add(px, py, (dx - radius * 0.5) * s * falloff, dy * s * falloff)
+    })
+    this.strokeCount += 1
+  }
+
+  /**
+   * 统一笔画调度器（供 UI 鼠标事件调用）。
+   * tool ∈ forward | reconstruct | smooth | clockwise | counterclockwise | pinch | inflate | pushLeft
+   * 中心类工具以终点 (toX,toY) 为笔刷中心；方向类工具使用 (fromX,fromY)→(toX,toY)。
+   */
+  stroke(tool, fromX, fromY, toX, toY, radius, amount, params = {}) {
+    const a = amount == null ? 1 : amount
+    switch (tool) {
+      case 'forward': this.forward(fromX, fromY, toX, toY, radius, a); break
+      case 'pushLeft': this.pushLeft(fromX, fromY, toX, toY, radius, a); break
+      case 'reconstruct': this.reconstruct(toX, toY, radius, a); break
+      case 'smooth': this.smooth(toX, toY, radius, a); break
+      case 'clockwise': this.clockwise(toX, toY, radius, params.angle ?? 0.5); break
+      case 'counterclockwise': this.counterclockwise(toX, toY, radius, params.angle ?? 0.5); break
+      case 'pinch': this.pinch(toX, toY, radius, a); break
+      case 'inflate': this.inflate(toX, toY, radius, a); break
+      default: return false
+    }
+    return true
   }
 
   _add(px, py, dx, dy) {

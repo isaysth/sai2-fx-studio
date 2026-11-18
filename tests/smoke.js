@@ -27,7 +27,7 @@ const manifest = require('../plugin.json')
 const fs = require('node:fs')
 
 async function main() {
-  assert.equal(manifest.version, '0.2.0', '清单版本应为 0.2.0')
+  assert.equal(manifest.version, '0.3.0', '清单版本应为 0.3.0')
   for (const key of ['autoPaste', 'fullPanelElevated', 'autoInject']) {
     assert.ok(plugin.configSchema[key], `配置缺少 ${key}`)
   }
@@ -49,7 +49,7 @@ async function main() {
     },
     effect() {}
   }
-  plugin.apply(ctx, { version: '0.2.0', autoInject: false })
+  plugin.apply(ctx, { version: '0.3.0', autoInject: false })
 
   const suiteAction = toolbar.find((a) => a.id === 'suite-open')
   const lightAction = toolbar.find((a) => a.id === 'fx-open')
@@ -74,8 +74,20 @@ async function main() {
     'Lab 取色器', '三角色盘', '渐变换色', '动作', '外观与快捷键', '缩时摄影']) {
     assert.ok(html.includes(tool), `浮窗工具菜单缺少 ${tool}`)
   }
-  for (const id of ['status-image', 'status-agent', 'zoom', 'btn-fit', 'btn-apply-clip', 'auto-paste']) {
-    assert.ok(html.includes(`id="${id}"`), `浮窗基础控件缺少 ${id}`)
+  for (const id of ['status-image', 'status-agent', 'zoom', 'btn-fit', 'btn-apply-clip', 'auto-paste',
+    'curve', 'gradient', 'lab-plane', 'triad', 'history-list', 'action-list', 'filter-grid', 'overlay']) {
+    assert.ok(html.includes(`id="${id}"`), `浮窗缺少控件或工具 ${id}`)
+  }
+  for (const page of ['liquify', 'blur', 'filter', 'adjust', 'selection', 'tools']) {
+    assert.ok(html.includes(`data-page="${page}"`), `缺少功能页 ${page}`)
+  }
+
+  // 滤镜列表应来自我们自己的算法引擎
+  const filters = require('../algorithms/filters.js')
+  assert.ok(filters.FILTER_LIST && filters.FILTER_LIST.length >= 53, 'FILTER_LIST 至少 53 项')
+  const indexSrc = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8')
+  for (const msg of ['liquifyStroke', 'selection', 'colorPlane', 'actionReplay', 'historyRevert']) {
+    assert.ok(indexSrc.includes(`'${msg}'`), `消息路由缺少 ${msg}`)
   }
 
   // 缺失套件时不能崩溃，也不能启动进程（重新加载真实模块）

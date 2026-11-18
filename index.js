@@ -20,6 +20,11 @@ const clip = require('./core/clipboard.js')
 const clipWin = require('./core/clipboard-win.js')
 const desktop = require('./core/desktop.js')
 const suite = require('./core/suite.js')
+const { Selection } = require('./core/selection.js')
+const color = require('./core/color.js')
+const { History } = require('./core/history.js')
+const { ActionRecorder } = require('./core/actions.js')
+const { FILTER_LIST } = require('./algorithms/filters.js')
 
 const PLUGIN_ID = 'sai2-fx-studio'
 const PREVIEW_MAX_DIM = 900
@@ -30,6 +35,13 @@ function apply(ctx, config) {
   let liquify = null // 当前液化会话（全分辨率位移场）
   let lastPreview = null // 上一次预览结果（应用时用）
   let windowOpen = false
+  let selection = null // 当前选区掩码（core/selection.js）
+  let selectionSize = null
+  const history = new History(50) // UI 可见历史（Session 自身另有撤销栈）
+  let actions = new ActionRecorder()
+  const stats = { ops: 0, strokes: 0, undos: 0 }
+  let recording = false
+  const appearance = { accent: '#7aa2ff', fontScale: 1, hotkeys: 'Ctrl+Alt' }
 
   // ---- 配置：默认使用随包附带的上游套件，也允许换成自定义目录 ----
   const BUNDLED_SUITE = path.join(__dirname, 'vendor', 'sai2-plugin-suite')
@@ -167,6 +179,77 @@ function apply(ctx, config) {
     post({ type: 'status', text })
   }
 
+  // ---- 选区 / 历史 / 统计 / 色彩工具（原创引擎） ----
+  function resolveMask(params) {
+    if (!params || params.mask !== true) return params
+    const out = Object.assign({}, params)
+    if (selection && session.hasImage()) {
+      const w = session.fullBase().width
+      const h = session.fullBase().height
+      if (!selectionSize || selectionSize.w !== w || selectionSize.h !== h) {
+        selection = new Selection(w, h)
+        selectionSize = { w, h }
+      }
+      out.mask = selection.mask()
+    } else {
+      out.mask = null
+    }
+    return out
+  }
+  function postMask() {
+    if (!selection || !selectionSize || !session.hasImage()) { post({ type: 'mask', dataUrl: null }); return }
+    const w = selectionSize.w
+    const h = selectionSize.h
+    const img = new (require('./core/image.js').ImageBuffer)(w, h)
+    const m = selection.mask()
+    for (let i = 0; i < w * h; i += 1) {
+      img.data[i * 4] = 255; img.data[i * 4 + 1] = 255; img.data[i * 4 + 2] = 255
+      img.data[i * 4 + 3] = m[i]
+    }
+    post({ type: 'mask', dataUrl: 'data:image/png;base64,' + Buffer.from(encodePNG(img)).toString('base64') })
+  }
+  function postHistory() { post({ type: 'history', list: history.list() }) }
+  function postStats() { post({ type: 'stats', stats }) }
+  function postActions() { post({ type: 'actions', list: actions.steps().map((s) => s.label || ((s.page || s.tab || '效果') + ' · ' + s.effect)) }) }
+
+  function sampleImage(size = 64) {
+    const { ImageBuffer } = require('./core/image.js')
+    const img = new ImageBuffer(size, size)
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const i = (y * size + x) * 4
+        const stripe = Math.sin((x + y) / 5) * 0.5 + 0.5
+        const circle = Math.hypot(x - size / 2, y - size / 2) < size / 4 ? 1 : 0
+        img.data[i] = Math.min(255, x / size * 200 + stripe * 55 + circle * 40)
+        img.data[i + 1] = Math.min(255, y / size * 180 + stripe * 60 + circle * 30)
+        img.data[i + 2] = Math.min(255, 120 + stripe * 100 + circle * 20)
+        img.data[i + 3] = 255
+      }
+    }
+    return img
+  }
+  function filterThumb(id) {
+    const meta = FILTER_LIST.find((f) => f.id === id)
+    const src = sampleImage(64)
+    const out = filters.apply(src, id, meta ? (meta.defaultParams || {}) : {})
+    return 'data:image/png;base64,' + Buffer.from(encodePNG(out)).toString('base64')
+  }
+  function labPlane(L, w, h) {
+    const { ImageBuffer } = require('./core/image.js')
+    const img = new ImageBuffer(w, h)
+    for (let y = 0; y < h; y += 1) {
+      for (let x = 0; x < w; x += 1) {
+        const rgb = color.labToRgb([L, (x / w - 0.5) * 200, (y / h - 0.5) * 200])
+        const i = (y * w + x) * 4
+        img.data[i] = Math.max(0, Math.min(255, rgb[0]))
+        img.data[i + 1] = Math.max(0, Math.min(255, rgb[1]))
+        img.data[i + 2] = Math.max(0, Math.min(255, rgb[2]))
+        img.data[i + 3] = 255
+      }
+    }
+    return 'data:image/png;base64,' + Buffer.from(encodePNG(img)).toString('base64')
+  }
+
   // 选中图层：记录行信息（真正的抓取在 grab 里按屏幕坐标点选）
   async function selectLayer(payload) {
     const row = payload && payload.row
@@ -195,6 +278,10 @@ function apply(ctx, config) {
         return
       }
       session.setImage(image)
+      history.clear()
+      selection = null
+      selectionSize = null
+      postHistory(); postMask()
       // 液化位移场按全分辨率重建
       liquify = new LiquifySession(image.width, image.height)
       lastPreview = null
@@ -211,9 +298,9 @@ function apply(ctx, config) {
   async function preview(message) {
     if (!session.hasImage()) { toast('请先抓取图层'); return }
     try {
-      const tab = message.tab
+      const tab = message.page || message.tab
       const effect = message.effect
-      const params = message.params || {}
+      const params = resolveMask(message.params || {})
       let result
       if (tab === 'liquify') {
         // 液化：位移场是全分辨率，render 会按比例采样降采样基准
@@ -239,9 +326,9 @@ function apply(ctx, config) {
   async function applyEffect(message) {
     if (!session.hasImage()) { toast('请先抓取图层'); return }
     try {
-      const tab = message.tab
+      const tab = message.page || message.tab
       const effect = message.effect
-      const params = message.params || {}
+      const params = resolveMask(message.params || {})
       const full = session.fullBase()
       let result
       if (tab === 'liquify') {
@@ -263,6 +350,13 @@ function apply(ctx, config) {
       const dib = clip.encodeDIBV5(result)
       await clipWin.writeDIBV5(dib)
       session.apply(result, effect)
+      history.push({ label: (tab || '效果') + ' · ' + effect, image: result })
+      stats.ops += 1
+      postHistory(); postStats()
+      if (recording) {
+        actions.record((tab || '效果') + ' · ' + effect, { page: tab, effect, params: params })
+        postActions()
+      }
       if (tab === 'liquify') liquify = new LiquifySession(full.width, full.height)
       // 「应用 → 剪贴板」只写剪贴板；「应用并贴回」才切回 SAI2 粘贴。
       const shouldPaste = message && Object.prototype.hasOwnProperty.call(message, 'paste')
@@ -279,15 +373,37 @@ function apply(ctx, config) {
 
   function undo() {
     if (session.undo()) {
+      history.undo()
+      stats.undos += 1
       post({ type: 'image', dataUrl: imageToDataUrl(session.applied) })
+      postHistory(); postStats()
       toast('已撤销')
     } else toast('没有可撤销的操作')
+  }
+  function redo() {
+    const entry = history.redo()
+    if (!entry || !entry.image) { toast('没有可重做的操作'); return }
+    session.setImage(entry.image)
+    post({ type: 'image', dataUrl: imageToDataUrl(session.applied) })
+    postHistory()
+    toast('已重做')
+  }
+  function revertTo(index) {
+    const entry = history.revertTo(index)
+    if (!entry || !entry.image) { toast('该历史步骤不可用'); return }
+    session.setImage(entry.image)
+    liquify = new LiquifySession(session.applied.width, session.applied.height)
+    post({ type: 'image', dataUrl: imageToDataUrl(session.applied) })
+    postHistory()
+    toast('已回到：' + entry.label)
   }
   function reset() {
     if (!session.hasImage()) return
     session.reset()
     liquify = new LiquifySession(session.applied.width, session.applied.height)
+    history.clear()
     post({ type: 'image', dataUrl: imageToDataUrl(session.applied) })
+    postHistory()
     toast('已复位到抓取时的原图')
   }
 
@@ -390,8 +506,115 @@ function apply(ctx, config) {
       case 'preview': void preview(message); break
       case 'apply': void applyEffect(message); break
       case 'undo': undo(); break
+      case 'redo': redo(); break
+      case 'historyRevert': revertTo(Number(message.index)); break
       case 'reset': reset(); break
       case 'openSuitePanel': void openSuitePanel(message.tool); break
+      case 'param': break // 参数已随 preview/apply 消息带来
+      case 'filterList':
+        post({
+          type: 'filterList',
+          list: FILTER_LIST.map((f) => ({ id: f.id, name: f.name, group: f.group, defaultParams: f.defaultParams || {} }))
+        })
+        break
+      case 'thumb': post({ type: 'thumb', id: message.id, dataUrl: filterThumb(message.id) }); break
+      case 'color': {
+        const v = message.value || []
+        const rgb = message.from === 'lab' ? color.labToRgb(v)
+          : message.from === 'hsv' ? color.hsvToRgb(v) : v
+        post({ type: 'color', requestId: message.requestId, rgb, hex: color.rgbToHex(rgb) })
+        break
+      }
+      case 'colorPlane':
+        post({ type: 'colorPlane', requestId: message.requestId,
+          dataUrl: labPlane(Number(message.L) || 60, Number(message.w) || 128, Number(message.h) || 128) })
+        break
+      case 'stats':
+        if (message.reset) { stats.ops = 0; stats.strokes = 0; stats.undos = 0 }
+        postStats()
+        break
+      case 'actionRecord': recording = !!message.on; toast(recording ? '动作录制已开始' : '动作录制已停止'); break
+      case 'actionReplay':
+        void (async () => {
+          const steps = actions.steps()
+          for (const item of steps) {
+            const step = item.step || item
+            await applyEffect({ page: step.page, effect: step.effect, params: step.params, paste: false })
+          }
+          toast(`已回放 ${steps.length} 步动作`)
+        })()
+        break
+      case 'actionSave': {
+        const file = path.join(ctx.dataDir || __dirname, 'actions.sai2act')
+        try {
+          fs.writeFileSync(file, JSON.stringify(actions.serialize(), null, 2))
+          toast('动作已保存：' + file)
+        } catch (err) { toast('保存失败：' + err.message) }
+        break
+      }
+      case 'actionLoad': {
+        const file = path.join(ctx.dataDir || __dirname, 'actions.sai2act')
+        try {
+          const loaded = ActionRecorder.load(JSON.parse(fs.readFileSync(file, 'utf8')))
+          actions = loaded
+          postActions()
+          toast('动作已加载')
+        } catch (err) { toast('加载失败：' + err.message) }
+        break
+      }
+      case 'appearance':
+        Object.assign(appearance, { accent: message.accent, fontScale: message.fontScale, hotkeys: message.hotkeys })
+        break
+      case 'liquifyStroke': {
+        if (!session.hasImage() || !liquify) break
+        const w = session.fullBase().width
+        const h = session.fullBase().height
+        const a = message.from || { x: 0, y: 0 }
+        const b = message.to || a
+        try {
+          liquify.stroke(message.tool || 'forward',
+            a.x * w, a.y * h, b.x * w, b.y * h,
+            Number(message.radius) || 24, Number(message.amount) || 1, message.params || {})
+          post({ type: 'image', dataUrl: imageToDataUrl(liquify.render(session.previewBase())) })
+        } catch (err) { log.warn(`liquifyStroke: ${err.message}`) }
+        break
+      }
+      case 'selection': {
+        if (!session.hasImage()) break
+        const w = session.fullBase().width
+        const h = session.fullBase().height
+        if (!selectionSize || selectionSize.w !== w || selectionSize.h !== h) {
+          selection = new Selection(w, h); selectionSize = { w, h }
+        }
+        const pt = (p) => [p.x * w, p.y * h]
+        const pts = (message.points || []).map(pt)
+        try {
+          switch (message.op) {
+            case 'rect': {
+              const a = pt(message.from || { x: 0, y: 0 })
+              const b = pt(message.to || { x: 1, y: 1 })
+              selection.rect(a[0], a[1], b[0] - a[0], b[1] - a[1]); break
+            }
+            case 'ellipse': {
+              const a = pt(message.from || { x: 0, y: 0 })
+              const b = pt(message.to || { x: 1, y: 1 })
+              selection.ellipse((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, Math.abs(b[0] - a[0]) / 2, Math.abs(b[1] - a[1]) / 2); break
+            }
+            case 'lasso': selection.lasso(pts); break
+            case 'pen': selection.pen(pts); break
+            case 'magicWand': {
+              const p = pts[0] || pt({ x: 0, y: 0 })
+              selection.magicWand(session.fullBase(), p[0], p[1], Number(message.tolerance) || 32); break
+            }
+            case 'feather': selection.feather(Number(message.radius) || 4); break
+            case 'invert': selection.invert(); break
+            case 'clear': selection.clear(); break
+            default: break
+          }
+          postMask()
+        } catch (err) { toast('选区操作失败：' + err.message) }
+        break
+      }
       default: break
     }
   }

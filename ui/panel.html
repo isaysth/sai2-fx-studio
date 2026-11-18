@@ -4,492 +4,713 @@
 <meta charset="UTF-8">
 <title>SAI2 FX Studio</title>
 <style>
-  :root {
-    --fx-bg: rgba(28, 30, 38, 0.72);
-    --fx-panel: rgba(48, 51, 62, 0.66);
-    --fx-panel2: rgba(64, 68, 80, 0.55);
-    --fx-line: rgba(255, 255, 255, 0.12);
-    --fx-text: #eef0f6;
-    --fx-dim: #a8adbd;
-    --fx-accent: var(--accent, #7aa2ff);
-    --fx-radius: var(--radius, 12px);
-    --fx-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    font-family: "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
-    color: var(--fx-text);
-    background: var(--fx-bg);
-    backdrop-filter: blur(24px) saturate(150%);
-    -webkit-backdrop-filter: blur(24px) saturate(150%);
-    border: 1px solid var(--fx-line);
-    border-radius: var(--fx-radius);
-    box-shadow: var(--fx-shadow);
-    overflow: hidden;
-    font-size: 13px;
-  }
-  /* 自绘标题栏 */
-  .titlebar {
-    height: 38px; display: flex; align-items: center; gap: 10px;
-    padding: 0 12px; background: var(--fx-panel);
-    border-bottom: 1px solid var(--fx-line);
-    -webkit-app-region: drag; user-select: none;
-  }
-  .titlebar .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fx-accent); }
-  .titlebar .name { font-weight: 600; letter-spacing: .3px; }
-  .titlebar .ver { color: var(--fx-dim); font-size: 11px; }
-  .titlebar .spacer { flex: 1; }
-  .titlebar button {
-    -webkit-app-region: no-drag; border: 0; color: var(--fx-text);
-    background: transparent; width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 15px;
-  }
-  .titlebar button:hover { background: var(--fx-panel2); }
-
-  .layout { display: flex; height: calc(100% - 38px); }
-  .tabs {
-    width: 96px; flex: none; background: var(--fx-panel);
-    border-right: 1px solid var(--fx-line); padding: 10px 6px; display: flex; flex-direction: column; gap: 4px;
-  }
-  .tabs button {
-    border: 0; background: transparent; color: var(--fx-dim); text-align: left;
-    padding: 9px 10px; border-radius: 8px; cursor: pointer; font-size: 13px;
-  }
-  .tabs button.active { background: var(--fx-panel2); color: var(--fx-text); box-shadow: inset 2px 0 var(--fx-accent); }
-  .tabs .foot { margin-top: auto; font-size: 10px; color: var(--fx-dim); padding: 6px; line-height: 1.5; }
-
-  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  .layers {
-    height: 122px; flex: none; border-bottom: 1px solid var(--fx-line);
-    padding: 8px 12px; overflow: auto;
-  }
-  .layers .hd { color: var(--fx-dim); font-size: 11px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-  .layers .hd button {
-    border: 1px solid var(--fx-line); background: var(--fx-panel2); color: var(--fx-text);
-    border-radius: 6px; padding: 2px 9px; cursor: pointer; font-size: 11px;
-  }
-  .layer-row { padding: 4px 8px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .layer-row:hover { background: var(--fx-panel2); }
-  .layer-row.sel { background: var(--fx-accent); color: #fff; }
-
-  .stage { flex: 1; display: flex; min-height: 0; }
-  .canvas-wrap {
-    flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center;
-    padding: 12px; overflow: hidden;
-    background:
-      linear-gradient(45deg, rgba(255,255,255,.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.04) 75%),
-      linear-gradient(45deg, rgba(255,255,255,.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.04) 75%);
-    background-size: 18px 18px; background-position: 0 0, 9px 9px;
-  }
-  .canvas-wrap canvas { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 4px 18px rgba(0,0,0,.4); }
-  .canvas-wrap .empty { color: var(--fx-dim); text-align: center; line-height: 1.8; }
-
-  .params { width: 248px; flex: none; border-left: 1px solid var(--fx-line); background: var(--fx-panel); padding: 12px; overflow: auto; }
-  .params h3 { margin: 0 0 10px; font-size: 13px; }
-  .row { margin-bottom: 12px; }
-  .row label { display: flex; justify-content: space-between; color: var(--fx-dim); font-size: 11px; margin-bottom: 5px; }
-  .row input[type=range] { width: 100%; accent-color: var(--fx-accent); }
-  .row select, .row input[type=text], .row input[type=number] {
-    width: 100%; background: var(--fx-panel2); color: var(--fx-text);
-    border: 1px solid var(--fx-line); border-radius: 6px; padding: 5px 7px; font-size: 12px;
-  }
-  .actions { display: flex; gap: 8px; margin-top: 14px; }
-  .actions button {
-    flex: 1; border: 0; border-radius: 8px; padding: 9px; cursor: pointer; font-size: 12px;
-    background: var(--fx-panel2); color: var(--fx-text);
-  }
-  .actions button.primary { background: var(--fx-accent); color: #fff; }
-  .actions button:disabled { opacity: .45; cursor: not-allowed; }
-  /* 状态栏 / 工具菜单 */
-  .statusbar {
-    height: 30px; flex: none; display: flex; align-items: center; gap: 10px;
-    padding: 0 10px; border-top: 1px solid var(--fx-line);
-    background: var(--fx-panel); color: var(--fx-dim); font-size: 11px;
-  }
-  .statusbar .sep { flex: 1; }
-  .statusbar input[type=range] { width: 110px; accent-color: var(--fx-accent); }
-  .statusbar button {
-    border: 1px solid var(--fx-line); background: var(--fx-panel2); color: var(--fx-text);
-    border-radius: 5px; padding: 2px 8px; cursor: pointer; font-size: 11px;
-  }
-  .toolbtn {
-    border: 1px solid var(--fx-line) !important; background: var(--fx-panel2) !important;
-    width: auto !important; padding: 4px 10px !important; font-size: 12px !important;
-  }
-  .tool-menu {
-    position: absolute; right: 10px; top: 34px; z-index: 20; min-width: 232px;
-    background: #f7f9fc; color: #20242e; border: 1px solid #d5dae4; border-radius: 8px;
-    box-shadow: 0 10px 32px rgba(0,0,0,.35); padding: 6px; font-size: 12px; display: none;
-  }
-  .tool-menu.show { display: block; }
-  .tool-menu .group { padding: 5px 9px 2px; color: #7b8292; font-size: 10px; letter-spacing: .5px; }
-  .tool-menu button {
-    display: block; width: 100%; text-align: left; border: 0; background: transparent;
-    color: #20242e; padding: 5px 9px; border-radius: 5px; cursor: pointer; font-size: 12px;
-  }
-  .tool-menu button:hover { background: #e8edf7; }
-  .tool-menu hr { border: 0; border-top: 1px solid #e3e7ef; margin: 4px 2px; }
-  .canvas-wrap.gray canvas { filter: grayscale(1); }
-  .toast {
-    position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
-    background: rgba(0,0,0,.72); color: #fff; padding: 7px 14px; border-radius: 20px;
-    font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none;
-  }
-  .toast.show { opacity: 1; }
+:root {
+  --bg: rgba(28,30,38,.78); --panel: rgba(48,51,62,.72); --panel2: rgba(64,68,80,.58);
+  --line: rgba(255,255,255,.12); --text: #eef0f6; --dim: #a8adbd;
+  --accent: var(--fx-accent, #7aa2ff); --radius: 12px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font: 13px/1.5 "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+  color: var(--text); background: var(--bg); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+  backdrop-filter: blur(24px) saturate(150%); -webkit-backdrop-filter: blur(24px) saturate(150%);
+  font-size: calc(13px * var(--font-scale, 1));
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+.titlebar {
+  height: 38px; display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  background: var(--panel); border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag; user-select: none;
+}
+.titlebar .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.titlebar .spacer { flex: 1; }
+.titlebar button {
+  -webkit-app-region: no-drag; border: 1px solid var(--line); background: var(--panel2);
+  color: var(--text); border-radius: 6px; padding: 3px 9px; font-size: 12px;
+}
+.titlebar button:hover { border-color: var(--accent); }
+.app { display: flex; height: calc(100% - 38px); }
+.side {
+  width: 92px; flex: none; background: var(--panel); border-right: 1px solid var(--line);
+  padding: 8px 6px; display: flex; flex-direction: column; gap: 3px;
+}
+.side button {
+  border: 0; background: transparent; color: var(--dim); text-align: left;
+  padding: 8px 10px; border-radius: 8px; font-size: 12px;
+}
+.side button.active { background: var(--panel2); color: var(--text); box-shadow: inset 2px 0 var(--accent); }
+.side .foot { margin-top: auto; font-size: 10px; color: var(--dim); padding: 6px; line-height: 1.5; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.canvas-area {
+  flex: 1; min-height: 0; position: relative; overflow: hidden; cursor: crosshair;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    linear-gradient(45deg, rgba(255,255,255,.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.04) 75%),
+    linear-gradient(45deg, rgba(255,255,255,.04) 25%, transparent 25%, transparent 75%, rgba(255,255,255,.04) 75%);
+  background-size: 18px 18px; background-position: 0 0, 9px 9px;
+}
+.canvas-area canvas { position: absolute; transform-origin: 0 0; }
+.canvas-area #preview { box-shadow: 0 4px 18px rgba(0,0,0,.4); border-radius: 4px; }
+.canvas-area #overlay { pointer-events: none; opacity: .6; }
+.canvas-area.gray #preview { filter: grayscale(1); }
+.empty { color: var(--dim); text-align: center; line-height: 2; }
+.layers { height: 104px; flex: none; border-top: 1px solid var(--line); padding: 6px 10px; overflow: auto; }
+.layers .hd { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 11px; color: var(--dim); }
+.layers .hd button, .mini {
+  border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+  border-radius: 5px; padding: 2px 8px; font-size: 11px;
+}
+.layer-row { padding: 3px 8px; border-radius: 5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.layer-row:hover { background: var(--panel2); }
+.layer-row.sel { background: var(--accent); color: #fff; }
+.statusbar {
+  height: 30px; flex: none; display: flex; align-items: center; gap: 8px;
+  padding: 0 10px; border-top: 1px solid var(--line); background: var(--panel); color: var(--dim); font-size: 11px;
+}
+.statusbar .sep { flex: 1; }
+.statusbar input[type=range] { width: 100px; accent-color: var(--accent); }
+.params { width: 286px; flex: none; border-left: 1px solid var(--line); background: var(--panel); padding: 10px; overflow: auto; }
+.params h3 { margin: 0 0 8px; font-size: 13px; }
+.params h4 { margin: 14px 0 6px; font-size: 11px; color: var(--dim); font-weight: 500; }
+.row { margin-bottom: 9px; }
+.row > label { display: flex; justify-content: space-between; color: var(--dim); font-size: 11px; margin-bottom: 3px; }
+.row input[type=range] { width: 100%; accent-color: var(--accent); }
+.row select, .row input[type=text], .row input[type=number] {
+  width: 100%; background: var(--panel2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; font-size: 12px;
+}
+.row.checkbox label { justify-content: flex-start; gap: 6px; }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.grid button {
+  border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+  border-radius: 5px; padding: 5px 2px; font-size: 10px; overflow: hidden; text-overflow: ellipsis;
+}
+.grid button.active { border-color: var(--accent); box-shadow: inset 0 -2px var(--accent); }
+.grid.thumb button { padding: 0; height: 54px; font-size: 9px; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+.grid.thumb button img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .5; }
+.grid.thumb button span { position: relative; background: rgba(0,0,0,.6); width: 100%; }
+.actions { display: flex; gap: 6px; margin-top: 10px; }
+.actions button {
+  flex: 1; border: 0; border-radius: 7px; padding: 8px 4px; font-size: 11px;
+  background: var(--panel2); color: var(--text);
+}
+.actions button.primary { background: var(--accent); color: #fff; }
+.actions button:disabled { opacity: .4; cursor: not-allowed; }
+.tool-menu {
+  position: absolute; right: 10px; top: 34px; z-index: 20; min-width: 230px; max-height: 70vh; overflow: auto;
+  background: #f7f9fc; color: #20242e; border: 1px solid #d5dae4; border-radius: 8px;
+  box-shadow: 0 10px 32px rgba(0,0,0,.35); padding: 6px; font-size: 12px; display: none;
+}
+.tool-menu.show { display: block; }
+.tool-menu .group { padding: 5px 9px 2px; color: #7b8292; font-size: 10px; }
+.tool-menu button {
+  display: block; width: 100%; text-align: left; border: 0; background: transparent;
+  color: #20242e; padding: 5px 9px; border-radius: 5px; font-size: 12px;
+}
+.tool-menu button:hover { background: #e8edf7; }
+.tool-menu hr { border: 0; border-top: 1px solid #e3e7ef; margin: 4px 2px; }
+.editor { width: 100%; background: #20242e; border: 1px solid var(--line); border-radius: 5px; touch-action: none; }
+.list { max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 5px; }
+.list div { padding: 4px 8px; border-bottom: 1px solid var(--line); font-size: 11px; cursor: pointer; }
+.list div:last-child { border-bottom: 0; }
+.list div:hover { background: var(--panel2); }
+.toast {
+  position: absolute; left: 50%; bottom: 44px; transform: translateX(-50%);
+  background: rgba(0,0,0,.78); color: #fff; padding: 7px 14px; border-radius: 20px;
+  font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30;
+}
+.toast.show { opacity: 1; }
+.note { color: var(--dim); font-size: 10px; line-height: 1.6; }
 </style>
 </head>
 <body>
-  <div class="titlebar">
-    <span class="dot"></span>
-    <span class="name">SAI2 FX Studio</span>
-    <span class="ver">非官方 · v0.1.0</span>
-    <span class="spacer"></span>
-    <button id="btn-tools" class="toolbtn" title="完整工具面板全部工具">工具 ▾</button>
-    <button id="btn-close" title="关闭">✕</button>
-  </div>
-  <div class="tool-menu" id="tool-menu">
-    <div class="group">图像处理（打开完整功能面板）</div>
-    <button data-tool="模糊">模糊</button>
-    <button data-tool="滤镜">滤镜</button>
-    <button data-tool="调整">调整</button>
-    <button data-tool="液化">液化</button>
-    <hr>
-    <div class="group">工具 ▾（随包上游套件）</div>
-    <button data-tool="笔刷导入">笔刷导入…</button>
-    <button data-tool="画布盖印">画布盖印…</button>
-    <button data-tool="穿透橡皮">穿透橡皮（选中图层）</button>
-    <button data-tool="历史记录">历史记录</button>
-    <button data-tool="统计">统计</button>
-    <button data-tool="黑白监看">黑白监看（本窗口）</button>
-    <button data-tool="SAI2 画布黑白覆盖">SAI2 画布黑白覆盖</button>
-    <button data-tool="Lab 取色器">Lab 取色器</button>
-    <button data-tool="三角色盘">三角色盘</button>
-    <button data-tool="渐变换色">渐变换色</button>
-    <button data-tool="动作">动作</button>
-    <button data-tool="外观与快捷键">外观与快捷键</button>
-    <hr>
-    <div class="group">缩时摄影</div>
-    <button data-tool="缩时摄影">录制 / 暂停 / 目录 / 2K</button>
-  </div>
-  <div class="layout">
-    <div class="tabs" id="tabs">
-      <button data-tab="liquify" class="active">液化</button>
-      <button data-tab="blur">模糊</button>
-      <button data-tab="filter">滤镜</button>
-      <button data-tab="adjust">调整</button>
-      <div class="foot">UI/核心为原创重写<br>算法移植自 MIT 项目<br>详见「关于」</div>
-      <button data-tab="about">关于</button>
+<div class="titlebar">
+  <span class="dot"></span><b>SAI2 FX Studio</b><span class="note">非官方 · v0.3.0 · 原创 UI / 引擎</span>
+  <span class="spacer"></span>
+  <button id="btn-tools">工具 ▾</button>
+  <button id="btn-close">✕</button>
+</div>
+<div class="tool-menu" id="tool-menu">
+  <div class="group">功能页</div>
+  <button data-page="liquify">液化</button><button data-page="blur">模糊</button>
+  <button data-page="filter">滤镜</button><button data-page="adjust">调整</button>
+  <hr><div class="group">工具箱</div>
+  <button data-tool="history">历史记录</button><button data-tool="stats">统计</button>
+  <button data-tool="lab">Lab 取色器</button><button data-tool="triad">三角色盘</button>
+  <button data-tool="actions">动作</button><button data-tool="appearance">外观与快捷键</button>
+  <button data-tool="gradient">渐变换色</button>
+  <button data-tool="gray">黑白监看（本窗口）</button>
+  <hr><div class="group">需原生组件的工具</div>
+  <button data-tool="brush">笔刷导入…</button><button data-tool="stamp">画布盖印…</button>
+  <button data-tool="eraser">穿透橡皮（选中图层）</button><button data-tool="overlay">SAI2 画布黑白覆盖</button>
+  <button data-tool="timelapse">缩时摄影</button>
+</div>
+<div class="app">
+  <nav class="side" id="side">
+    <button data-page="liquify" class="active">液化</button>
+    <button data-page="blur">模糊</button>
+    <button data-page="filter">滤镜</button>
+    <button data-page="adjust">调整</button>
+    <button data-page="selection">选区</button>
+    <button data-page="tools">工具箱</button>
+    <button data-page="about">关于</button>
+    <div class="foot">原创 UI / JS 引擎<br>算法移植自 MIT 项目</div>
+  </nav>
+  <div class="main">
+    <div class="canvas-area" id="canvas-area">
+      <canvas id="preview" style="display:none"></canvas>
+      <canvas id="overlay" style="display:none"></canvas>
+      <div class="empty" id="empty">尚未抓取图层<br>先在 SAI2 打开一幅画，再点「抓取当前图层」</div>
     </div>
-    <div class="main">
-      <div class="layers">
-        <div class="hd">
-          <span>图层（点选后抓取）</span>
-          <button id="btn-refresh">刷新图层</button>
-          <button id="btn-inject">连接注入</button>
-          <button id="btn-whitelist" title="以管理员身份运行随包的添加白名单.bat">加白名单</button>
-          <button id="btn-grab">抓取当前图层</button>
-        </div>
-        <div id="layer-list"><div class="layer-row" style="color:var(--fx-dim)">未连接注入器，点「刷新图层」重试</div></div>
-      </div>
-      <div class="stage">
-        <div class="canvas-wrap" id="canvas-wrap">
-          <canvas id="preview" style="display:none"></canvas>
-          <div class="empty" id="empty">尚未抓取图层<br>先在 SAI2 打开一幅画，再点「抓取当前图层」</div>
-        </div>
-        <div class="params" id="params"></div>
-      </div>
-      <div class="statusbar">
-        <span id="status-image">尚未抓取图层</span>
-        <span id="status-agent">未连接注入器</span>
-        <span class="sep"></span>
-        <span>缩放</span>
-        <input type="range" id="zoom" min="25" max="400" step="5" value="100">
-        <span id="zoom-label">100%</span>
-        <button id="btn-fit">适配</button>
-      </div>
+    <div class="layers">
+      <div class="hd"><span>SAI2 图层</span><button id="btn-refresh">刷新</button>
+        <button id="btn-inject">连接注入</button><button id="btn-whitelist">加白名单</button>
+        <button id="btn-grab">抓取当前图层</button></div>
+      <div id="layer-list"></div>
+    </div>
+    <div class="statusbar">
+      <span id="status-image">尚未抓取图层</span><span id="status-agent">未连接注入器</span>
+      <span class="sep"></span><span>缩放</span>
+      <input type="range" id="zoom" min="25" max="400" step="5" value="100">
+      <span id="zoom-label">100%</span><button class="mini" id="btn-fit">适配</button>
     </div>
   </div>
-  <div class="toast" id="toast"></div>
-
+  <aside class="params" id="params"></aside>
+</div>
+<div class="toast" id="toast"></div>
 <script>
 (function () {
-  'use strict'
-  var bridge = window.pluginBridge
-  var state = {
-    tab: 'liquify', effect: '', params: {}, layers: [], sel: -1,
-    hasImage: false, agentOk: false, zoom: 100, imageUrl: null,
-    imgW: 0, imgH: 0, gray: false, autoPaste: true
-  }
+'use strict'
+var bridge = window.pluginBridge
+var state = {
+  page: 'liquify', effect: '', params: {}, layers: [], sel: -1, hasImage: false, agentOk: false,
+  zoom: 100, imageUrl: null, imgW: 0, imgH: 0, gray: false, autoPaste: true,
+  filterThumbs: {}, filterGroup: '全部', selectionTool: 'rect', selectionActive: false,
+  history: [], stats: { ops: 0, strokes: 0, undos: 0 }, actions: [], recording: false,
+  lab: { L: 60, a: 0, b: 0, hex: '' }, triadH: 210, triadS: 0.7, triadV: 0.9,
+  gradientStops: [{pos:0,color:[0,0,0]},{pos:1,color:[255,255,255]}], curvePoints: null,
+  accent: '#7aa2ff', fontScale: 1, hotkeys: 'Ctrl+Alt', reqId: 0, pending: {}
+}
+function send(type, extra) {
+  if (!bridge) return toast('浮窗通信未就绪')
+  var msg = { type: type }
+  if (extra) for (var k in extra) msg[k] = extra[k]
+  bridge.send(msg)
+}
+function request(type, extra, cb) {
+  var id = 'r' + (++state.reqId)
+  state.pending[id] = cb
+  send(type, Object.assign({ requestId: id }, extra || {}))
+}
+function toast(text) {
+  var t = document.getElementById('toast')
+  t.textContent = text; t.classList.add('show')
+  clearTimeout(t._timer); t._timer = setTimeout(function () { t.classList.remove('show') }, 2000)
+}
 
-  function send(type, extra) {
-    if (!bridge) return toast('浮窗通信未就绪')
-    var msg = { type: type }
-    if (extra) for (var k in extra) msg[k] = extra[k]
-    bridge.send(msg)
-  }
-  function toast(text) {
-    var t = document.getElementById('toast')
-    t.textContent = text; t.classList.add('show')
-    clearTimeout(t._timer)
-    t._timer = setTimeout(function () { t.classList.remove('show') }, 1800)
-  }
+// ---- 效果定义（effect id 与引擎一致） ----
+var LIQUIFY_TOOLS = [
+  ['forward','向前变形'],['reconstruct','重建'],['smooth','平滑'],['clockwise','顺时针'],
+  ['counterclockwise','逆时针'],['pinch','褶皱'],['inflate','膨胀'],['pushLeft','左推']
+]
+function mk(id, name, params) {
+  return { id:id, name:name, params:params.map(function(p){return [p[0],p[1],'range',p[2],p[3],p[4]]}) }
+}
+var DEFS = {
+  liquify: { title:'液化', effects: LIQUIFY_TOOLS.map(function(t){
+    return mk(t[0],t[1],[['radius','笔刷半径',2,120,24],['amount','强度',-3,3,1]])
+  }) },
+  blur: { title:'模糊', effects: [
+    mk('gaussian','高斯模糊',[['radius','半径',0,60,6],['sigma','Sigma',0.5,12,2]]),
+    mk('box','方框模糊',[['radius','半径',0,60,8]]),
+    mk('motion','动感模糊',[['distance','距离',0,60,10],['angle','角度',0,360,0]]),
+    mk('radial','径向模糊',[['strength','强度',0,1,0.4]]),
+    mk('surface','表面模糊',[['radius','半径',0,40,8],['amount','阈值',0,60,16]]),
+    mk('special','特殊模糊',[['radius','半径',0,40,6],['amount','阈值',0,60,12]]),
+    mk('lens','镜头模糊',[['radius','半径',0,40,8],['bright','阈值',0,60,12]]),
+    mk('average','平均模糊',[['radius','半径',1,80,16]]),
+    mk('perspective','透视模糊',[['strength','强度',0,1,0.4]])
+  ] },
+  filter: { title:'滤镜', effects: [] },
+  adjust: { title:'调整', effects: [
+    mk('invert','反相',[]),mk('grayscale','去色',[]),mk('threshold','阈值',[['threshold','阈值',0,255,128]]),
+    mk('posterize','色调分离',[['levels','级数',2,16,5]]),
+    mk('brightnessContrast','亮度对比度',[['brightness','亮度',-100,100,0],['contrast','对比度',-100,100,0]]),
+    mk('levels','色阶',[['black','黑场',0,255,0],['white','白场',0,255,255],['gamma','Gamma',0.1,3,1]]),
+    mk('hueSaturation','色相饱和度',[['hue','色相',-180,180,0],['saturation','饱和度',0,2,1],['lightness','明度',0,2,1]]),
+    mk('colorBalance','色彩平衡',[['cyanRed','青↔红',-100,100,0],['magentaGreen','洋红↔绿',-100,100,0],['yellowBlue','黄↔蓝',-100,100,0]]),
+    mk('gradientMap','渐变映射',[]),mk('curves','曲线',[])
+  ] }
+}
+var FILTER_GROUPS = ['全部','艺术','模糊','画笔','扭曲','风格化','纹理','颜色','手写']
+function paramsFor(def) { var o={}; def.params.forEach(function(p){o[p[0]]=p[5]}); return o }
+function currentDef() { return DEFS[state.page] }
+function currentEffect() {
+  var d=currentDef(); if(!d)return null
+  return d.effects.find(function(e){return e.id===state.effect}) || d.effects[0]
+}
 
-  // ---- 参数界面定义 ----
-  var DEFS = {
-    liquify: {
-      title: '液化', effects: [
-        { id: 'forward', name: '向前变形', params: [['radius', '笔刷半径', 'range', 1, 80, 24], ['strength', '强度', 'range', 0.1, 3, 1]] },
-        { id: 'inflate', name: '膨胀', params: [['radius', '笔刷半径', 'range', 1, 80, 24], ['amount', '强度', 'range', -3, 3, 1]] },
-        { id: 'swirl', name: '旋转', params: [['radius', '笔刷半径', 'range', 1, 80, 24], ['angle', '角度', 'range', -1, 1, 0.4]] },
-        { id: 'smooth', name: '平滑', params: [['radius', '笔刷半径', 'range', 1, 80, 24], ['amount', '强度', 'range', 0.1, 2, 1]] }
-      ]
-    },
-    blur: {
-      title: '模糊', effects: [
-        { id: 'gaussian', name: '高斯模糊', params: [['radius', '半径', 'range', 0, 40, 5], ['sigma', 'Sigma', 'range', 0.5, 10, 2]] },
-        { id: 'box', name: '盒式模糊', params: [['radius', '半径', 'range', 0, 40, 6]] },
-        { id: 'motion', name: '运动模糊', params: [['distance', '距离', 'range', 0, 40, 8], ['angle', '角度', 'range', 0, 360, 0]] },
-        { id: 'zoom', name: '缩放模糊', params: [['strength', '强度', 'range', 0, 1, 0.3]] }
-      ]
-    },
-    filter: {
-      title: '滤镜', effects: [
-        { id: 'sharpen', name: '锐化', params: [['amount', '强度', 'range', 0.5, 3, 1]] },
-        { id: 'emboss', name: '浮雕', params: [] },
-        { id: 'edge', name: '边缘', params: [] },
-        { id: 'sepia', name: '怀旧', params: [] },
-        { id: 'cool', name: '冷色', params: [] },
-        { id: 'warm', name: '暖色', params: [] },
-        { id: 'bw', name: '高对比黑白', params: [['threshold', '阈值', 'range', 0, 255, 128]] },
-        { id: 'soften', name: '柔光', params: [['amount', '强度', 'range', 0, 1, 0.5]] },
-        { id: 'pixelate', name: '像素化', params: [['block', '块大小', 'range', 2, 32, 8]] },
-        { id: 'mosaic', name: '马赛克', params: [['block', '块大小', 'range', 2, 32, 8]] }
-      ]
-    },
-    adjust: {
-      title: '调整', effects: [
-        { id: 'invert', name: '反相', params: [] },
-        { id: 'grayscale', name: '去色', params: [] },
-        { id: 'brightnessContrast', name: '亮度对比度', params: [['brightness', '亮度', 'range', -100, 100, 0], ['contrast', '对比度', 'range', -100, 100, 0]] },
-        { id: 'hueSaturation', name: '色相饱和度', params: [['hue', '色相', 'range', -180, 180, 0], ['saturation', '饱和度', 'range', 0, 2, 1], ['lightness', '明度', 'range', 0, 2, 1]] },
-        { id: 'levels', name: '色阶', params: [['black', '黑场', 'range', 0, 255, 0], ['white', '白场', 'range', 0, 255, 255], ['gamma', 'Gamma', 'range', 0.1, 3, 1]] }
-      ]
+// ---- 参数面板 ----
+function renderParams() {
+  var box=document.getElementById('params')
+  if (state.page==='tools') return renderTools(box)
+  if (state.page==='about') {
+    box.innerHTML='<h3>关于</h3><div class="note">UI 层与核心引擎为原创重写：JS 图像模型、降采样预览、' +
+      '选区掩码、历史/动作、Lab/HSV 色彩工具、液化位移场均由本项目实现；算法逻辑移植自 MIT 项目 ' +
+      'PainterAnkry/sai2-plugin-suite。随包上游注入套件原样分发、未修改。<br><br>' +
+      '非官方作品，与上游作者无背书关系。使用注入类工具请备份画作。</div>'
+    return
+  }
+  if (state.page==='selection') return renderSelectionPanel(box)
+  var def=currentDef(); if(!def)return
+  if (def.effects.length && !def.effects.some(function(e){return e.id===state.effect})) {
+    state.effect=def.effects[0].id; state.params=paramsFor(def.effects[0])
+  }
+  if (!def.effects.length && !state.effect) state.params={}
+  var eff=currentEffect() || { id: state.effect, name: state.effect, params: [] }
+  var html='<h3>'+def.title+'</h3>'
+  if (state.page==='filter') {
+    html+='<div class="row"><label>分组</label><select id="filter-group">' +
+      FILTER_GROUPS.map(function(g){return '<option'+(g===state.filterGroup?' selected':'')+'>'+g+'</option>'}).join('') +
+      '</select></div><div class="grid thumb" id="filter-grid"></div>'
+  } else {
+    html+='<div class="grid" id="effect-grid">'+def.effects.map(function(e){
+      return '<button data-effect="'+e.id+'"'+(e.id===state.effect?' class="active"':'')+'>'+e.name+'</button>'
+    }).join('')+'</div>'
+  }
+  html+='<h4>参数</h4><div id="param-rows"></div>'
+  if (state.effect==='curves') html+='<canvas id="curve" class="editor" width="262" height="180"></canvas>' +
+    '<div class="note">拖动控制点；点空白处加一个点，右键删除。</div>'
+  if (state.effect==='gradientMap') html+='<canvas id="gradient" class="editor" width="262" height="40"></canvas>' +
+    '<div class="row"><label>色标颜色</label><input type="color" id="stop-color" value="#ffffff"></div>' +
+    '<div class="note">点渐变条加色标；拖动改位置；双击用上方颜色改色。</div>'
+  html+='<div class="actions"><button id="btn-preview">预览</button>' +
+    '<button id="btn-apply-clip"'+(state.hasImage?'':' disabled')+'>应用 → 剪贴板</button>' +
+    '<button id="btn-apply" class="primary"'+(state.hasImage?'':' disabled')+'>应用并贴回</button></div>' +
+    '<div class="actions"><button id="btn-undo">撤销</button><button id="btn-redo">重做</button><button id="btn-reset">复位</button></div>' +
+    '<div class="row checkbox" style="margin-top:10px"><label><input type="checkbox" id="auto-paste"' +
+    (state.autoPaste?' checked':'')+'> 应用后自动贴回</label></div>'
+  box.innerHTML=html
+  bindParams(eff)
+  if (state.page==='filter') renderFilterGrid()
+  if (state.effect==='curves') setupCurve()
+  if (state.effect==='gradientMap') setupGradient()
+}
+function renderParamRows(eff) {
+  var host=document.getElementById('param-rows'); if(!host)return
+  host.innerHTML=eff.params.map(function(p){
+    var val=state.params[p[0]]==null?p[5]:state.params[p[0]]
+    var step=Math.abs(p[4])<1?0.05:1
+    return '<div class="row"><label><span>'+p[1]+'</span><span id="v-'+p[0]+'">'+val+'</span></label>' +
+      '<input type="range" data-key="'+p[0]+'" min="'+p[3]+'" max="'+p[4]+'" step="'+step+'" value="'+val+'"></div>'
+  }).join('')
+  host.querySelectorAll('input[type=range]').forEach(function(el){
+    el.oninput=function(){
+      var key=el.dataset.key
+      state.params[key]=Number(el.value)
+      var label=document.getElementById('v-'+key); if(label)label.textContent=el.value
+      send('param',{page:state.page,effect:state.effect,key:key,value:state.params[key]})
     }
-  }
-
-  function renderParams() {
-    var box = document.getElementById('params')
-    if (state.tab === 'about') {
-      box.innerHTML = '<h3>关于</h3><div style="color:var(--fx-dim);line-height:1.8;font-size:12px">' +
-        'UI 层与核心引擎为原创重写；算法逻辑移植自 MIT 项目 PainterAnkry/sai2-plugin-suite。<br><br>' +
-        '随包附带上游 MIT 套件 v1.64.0（Celery fork），原样分发、未修改；打开浮窗默认自动注入。<br><br>' +
-        '首次使用若被杀软拦截，点「加白名单」以管理员运行随包脚本（UAC 需你确认）。<br><br>' +
-        '非官方作品，与上游作者及分享者无背书关系。使用注入类工具请自行评估风险并备份画作。</div>'
-      return
-    }
-    var def = DEFS[state.tab]
-    var html = '<h3>' + def.title + '</h3>'
-    html += '<div class="row"><label>效果</label><select id="effect">'
-    def.effects.forEach(function (e) {
-      html += '<option value="' + e.id + '"' + (state.effect === e.id ? ' selected' : '') + '>' + e.name + '</option>'
-    })
-    html += '</select></div>'
-    var eff = def.effects.find(function (e) { return e.id === state.effect }) || def.effects[0]
-    eff.params.forEach(function (p) {
-      var val = state.params[p[0]] == null ? p[5] : state.params[p[0]]
-      html += '<div class="row"><label><span>' + p[1] + '</span><span id="v-' + p[0] + '">' + val + '</span></label>' +
-        '<input type="range" data-key="' + p[0] + '" min="' + p[2] + '" max="' + p[3] + '" step="' + (p[0] === 'angle' && state.tab === 'filter' ? 1 : (Math.abs(p[4]) < 1 ? 0.05 : (p[4] < 5 ? 0.1 : 1))) + '" value="' + val + '"></div>'
-    })
-    html += '<div class="actions">' +
-      '<button id="btn-preview">预览</button>' +
-      '<button id="btn-apply-clip"' + (state.hasImage ? '' : ' disabled') + '>应用 → 剪贴板</button>' +
-      '<button id="btn-apply" class="primary"' + (state.hasImage ? '' : ' disabled') + '>应用并贴回</button>' +
-      '</div><div class="actions"><button id="btn-undo">撤销</button><button id="btn-reset">复位</button></div>'
-    html += '<div class="row" style="margin-top:10px"><label style="justify-content:flex-start;gap:6px">' +
-      '<input type="checkbox" id="auto-paste"' + (state.autoPaste ? ' checked' : '') + '> 应用后自动贴回 SAI2</label></div>'
-    box.innerHTML = html
-
-    document.getElementById('effect').onchange = function (e) {
-      state.effect = e.target.value
-      var ne = def.effects.find(function (x) { return x.id === state.effect })
-      state.params = {}
-      ne.params.forEach(function (p) { state.params[p[0]] = p[5] })
-      send('effect', { tab: state.tab, effect: state.effect, params: state.params })
-      renderParams()
-    }
-    box.querySelectorAll('input[type=range]').forEach(function (el) {
-      el.oninput = function () {
-        var key = el.dataset.key
-        state.params[key] = Number(el.value)
-        var label = document.getElementById('v-' + key)
-        if (label) label.textContent = el.value
-        send('param', { tab: state.tab, effect: state.effect, key: key, value: Number(el.value) })
-      }
-      el.onchange = function () { send('preview', { tab: state.tab, effect: state.effect, params: state.params }) }
-    })
-    document.getElementById('btn-preview').onclick = function () { send('preview', { tab: state.tab, effect: state.effect, params: state.params }) }
-    document.getElementById('btn-apply-clip').onclick = function () { send('apply', { tab: state.tab, effect: state.effect, params: state.params, paste: false }) }
-    document.getElementById('btn-apply').onclick = function () { send('apply', { tab: state.tab, effect: state.effect, params: state.params, paste: true }) }
-    document.getElementById('btn-undo').onclick = function () { send('undo') }
-    document.getElementById('btn-reset').onclick = function () { send('reset') }
-    document.getElementById('auto-paste').onchange = function () { state.autoPaste = !!this.checked }
-  }
-
-  function renderLayers() {
-    var box = document.getElementById('layer-list')
-    if (!state.layers.length) {
-      box.innerHTML = '<div class="layer-row" style="color:var(--fx-dim)">' + (state.agentOk ? '未识别到图层，先在 SAI2 里点一下图层面板' : '未连接注入器，点「刷新图层」重试') + '</div>'
-      return
-    }
-    box.innerHTML = ''
-    state.layers.forEach(function (r, i) {
-      var d = document.createElement('div')
-      d.className = 'layer-row' + (i === state.sel ? ' sel' : '')
-      d.textContent = '#' + (i + 1) + '  ' + r.text
-      d.onclick = function () { state.sel = i; renderLayers(); send('selectLayer', { index: i, row: r }) }
-      box.appendChild(d)
-    })
-  }
-
-  function paintPreview(img) {
-    var canvas = document.getElementById('preview')
-    var wrap = document.getElementById('canvas-wrap')
-    var maxW = Math.max(80, wrap.clientWidth - 24)
-    var maxH = Math.max(80, wrap.clientHeight - 24)
-    var fit = Math.min(1, maxW / img.width, maxH / img.height)
-    var s = fit * state.zoom / 100
-    canvas.width = Math.max(1, Math.round(img.width * s))
-    canvas.height = Math.max(1, Math.round(img.height * s))
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-    canvas.style.display = 'block'
-    document.getElementById('empty').style.display = 'none'
-    state.hasImage = true
-  }
-
-  function renderPreview() {
-    if (!state.imageUrl) return
-    var img = new Image()
-    img.onload = function () { paintPreview(img) }
-    img.src = state.imageUrl
-  }
-
-  function showImage(dataUrl) {
-    var canvas = document.getElementById('preview')
-    var empty = document.getElementById('empty')
-    state.imageUrl = dataUrl || null
-    if (!dataUrl) {
-      canvas.style.display = 'none'; empty.style.display = 'block'; state.hasImage = false
-      state.imgW = 0; state.imgH = 0
-      return
-    }
-    var img = new Image()
-    img.onload = function () {
-      state.imgW = img.width
-      state.imgH = img.height
-      paintPreview(img)
-      var apply = document.getElementById('btn-apply')
-      if (apply) apply.disabled = false
-      var clip = document.getElementById('btn-apply-clip')
-      if (clip) clip.disabled = false
-    }
-    img.src = dataUrl
-  }
-
-  // tabs
-  document.getElementById('tabs').querySelectorAll('button[data-tab]').forEach(function (b) {
-    b.onclick = function () {
-      document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('active') })
-      b.classList.add('active')
-      state.tab = b.dataset.tab
-      var def = DEFS[state.tab]
-      if (def && !def.effects.some(function (e) { return e.id === state.effect })) {
-        state.effect = def.effects[0].id
-        state.params = {}
-        def.effects[0].params.forEach(function (p) { state.params[p[0]] = p[5] })
-      }
+    el.onchange=function(){doPreview()}
+  })
+}
+function bindParams(eff) {
+  document.querySelectorAll('#effect-grid button').forEach(function(b){
+    b.onclick=function(){
+      state.effect=b.dataset.effect
+      var e=currentDef().effects.find(function(x){return x.id===state.effect})
+      state.params=paramsFor(e)
+      if(state.effect==='curves')state.curvePoints=null
+      if(state.effect==='gradientMap')state.gradientStops=[{pos:0,color:[0,0,0]},{pos:1,color:[255,255,255]}]
       renderParams()
     }
   })
-  document.getElementById('btn-close').onclick = function () { send('close') }
-  document.getElementById('btn-refresh').onclick = function () { send('refreshLayers') }
-  document.getElementById('btn-inject').onclick = function () { toast('正在连接注入器…'); send('inject') }
-  document.getElementById('btn-whitelist').onclick = function () { toast('请在 UAC 弹窗中确认'); send('whitelist') }
-  document.getElementById('btn-grab').onclick = function () { send('grab') }
-
-  // 完整工具面板入口：随包上游面板的「工具 ▾」全部功能
-  var toolMenu = document.getElementById('tool-menu')
-  document.getElementById('btn-tools').onclick = function (e) {
-    e.stopPropagation()
-    toolMenu.classList.toggle('show')
-  }
-  document.addEventListener('click', function (e) {
-    if (!toolMenu.contains(e.target) && e.target.id !== 'btn-tools') toolMenu.classList.remove('show')
+  var fg=document.getElementById('filter-group')
+  if(fg)fg.onchange=function(){state.filterGroup=this.value;renderFilterGrid()}
+  renderParamRows(eff)
+  document.getElementById('btn-preview').onclick=doPreview
+  document.getElementById('btn-apply-clip').onclick=function(){doApply(false)}
+  document.getElementById('btn-apply').onclick=function(){doApply(true)}
+  document.getElementById('btn-undo').onclick=function(){send('undo')}
+  document.getElementById('btn-redo').onclick=function(){send('redo')}
+  document.getElementById('btn-reset').onclick=function(){send('reset')}
+  document.getElementById('auto-paste').onchange=function(){state.autoPaste=!!this.checked}
+}
+function effectPayload() {
+  var p=Object.assign({},state.params)
+  if(state.effect==='curves'&&state.curvePoints)p.points=state.curvePoints
+  if(state.effect==='gradientMap')p.stops=state.gradientStops
+  if(state.selectionActive)p.mask=true
+  return {page:state.page,effect:state.effect,params:p,tool:state.effect}
+}
+function doPreview(){send('preview',effectPayload())}
+function doApply(paste){send('apply',Object.assign(effectPayload(),{paste:paste}))}
+function renderFilterGrid() {
+  var grid=document.getElementById('filter-grid'); if(!grid)return
+  var ids=Object.keys(state.filterThumbs).filter(function(id){
+    var f=state.filterThumbs[id]
+    return state.filterGroup==='全部'||(f&&f.group===state.filterGroup)
   })
-  toolMenu.querySelectorAll('button[data-tool]').forEach(function (b) {
-    b.onclick = function () {
-      var tool = b.dataset.tool
-      toolMenu.classList.remove('show')
-      if (tool === '黑白监看') {
-        state.gray = !state.gray
-        document.getElementById('canvas-wrap').classList.toggle('gray', state.gray)
-        toast(state.gray ? '本窗口预览已切黑白（不改原图）' : '已恢复彩色预览')
-        return
-      }
-      toast('正在打开完整工具面板…')
-      send('openSuitePanel', { tool: tool })
+  grid.innerHTML=ids.map(function(id){
+    var f=state.filterThumbs[id]
+    return '<button data-effect="'+id+'"'+(id===state.effect?' class="active"':'')+' title="'+f.name+'">' +
+      (f.dataUrl?'<img src="'+f.dataUrl+'">':'')+'<span>'+f.name+'</span></button>'
+  }).join('')
+  grid.querySelectorAll('button[data-effect]').forEach(function(b){
+    b.onclick=function(){
+      state.effect=b.dataset.effect
+      state.params=Object.assign({},state.filterThumbs[state.effect].defaultParams||{})
+      renderParams()
     }
   })
+}
 
-  // 缩放 / 适配
-  var zoomEl = document.getElementById('zoom')
-  zoomEl.oninput = function () {
-    state.zoom = Number(this.value)
-    document.getElementById('zoom-label').textContent = state.zoom + '%'
-    renderPreview()
+// ---- 曲线 / 渐变编辑器 ----
+function setupCurve() {
+  var c=document.getElementById('curve'); if(!c)return
+  if(!state.curvePoints)state.curvePoints=[
+    {x:0,y:0},{x:0.25,y:0.22},{x:0.5,y:0.5},{x:0.75,y:0.78},{x:1,y:1}]
+  var ctx=c.getContext('2d'), drag=-1
+  function xy(p){return [p.x*c.width,(1-p.y)*c.height]}
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle='rgba(255,255,255,.12)';ctx.lineWidth=1
+    for(var i=0;i<=4;i++){var x=i/4*c.width,y=i/4*c.height
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,c.height);ctx.stroke()
+      ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(c.width,y);ctx.stroke()}
+    ctx.strokeStyle='#7aa2ff';ctx.lineWidth=2;ctx.beginPath()
+    state.curvePoints.forEach(function(p,i){var q=xy(p);i?ctx.lineTo(q[0],q[1]):ctx.moveTo(q[0],q[1])})
+    ctx.stroke();ctx.fillStyle='#fff'
+    state.curvePoints.forEach(function(p){var q=xy(p);ctx.beginPath();ctx.arc(q[0],q[1],4,0,7);ctx.fill()})
   }
-  document.getElementById('btn-fit').onclick = function () {
-    state.zoom = 100; zoomEl.value = '100'
-    document.getElementById('zoom-label').textContent = '100%'
-    renderPreview()
+  function pos(e){var r=c.getBoundingClientRect()
+    return {x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,1-(e.clientY-r.top)/r.height))}}
+  c.onpointerdown=function(e){
+    var p=pos(e),idx=-1
+    state.curvePoints.forEach(function(q,i){if(Math.abs(q.x-p.x)<.05&&Math.abs(q.y-p.y)<.06)idx=i})
+    if(idx>=0)drag=idx
+    else if(e.button===0){state.curvePoints.push(p);state.curvePoints.sort(function(a,b){return a.x-b.x});draw();doPreview()}
   }
+  c.onpointermove=function(e){
+    if(drag<0)return
+    var p=pos(e)
+    if(drag===0||drag===state.curvePoints.length-1)p.x=state.curvePoints[drag].x
+    state.curvePoints[drag]=p;draw();doPreview()
+  }
+  c.onpointerup=function(){drag=-1}
+  c.oncontextmenu=function(e){
+    e.preventDefault();var p=pos(e),idx=-1
+    state.curvePoints.forEach(function(q,i){if(Math.abs(q.x-p.x)<.05&&Math.abs(q.y-p.y)<.06)idx=i})
+    if(idx>0&&idx<state.curvePoints.length-1){state.curvePoints.splice(idx,1);draw();doPreview()}
+  }
+  draw()
+}
+function setupGradient() {
+  var c=document.getElementById('gradient'); if(!c)return
+  var ctx=c.getContext('2d'),drag=-1
+  function draw(){
+    var g=ctx.createLinearGradient(0,0,c.width,0)
+    state.gradientStops.slice().sort(function(a,b){return a.pos-b.pos}).forEach(function(s){
+      g.addColorStop(s.pos,'rgb('+s.color.join(',')+')')})
+    ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height-10);ctx.fillStyle='#fff'
+    state.gradientStops.forEach(function(s){ctx.fillRect(s.pos*c.width-3,c.height-10,6,6)})
+  }
+  function pos(e){var r=c.getBoundingClientRect();return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))}
+  c.onpointerdown=function(e){
+    var p=pos(e),hit=-1
+    state.gradientStops.forEach(function(s,i){if(Math.abs(s.pos-p)<.03)hit=i})
+    if(hit>=0)drag=hit
+    else{document.getElementById('stop-color').value='#ffffff';state.gradientStops.push({pos:p,color:[255,255,255]});drag=state.gradientStops.length-1}
+    draw();doPreview()
+  }
+  c.onpointermove=function(e){if(drag<0)return;state.gradientStops[drag].pos=pos(e);draw();doPreview()}
+  c.onpointerup=function(){drag=-1}
+  c.ondblclick=function(e){
+    var p=pos(e),hit=-1
+    state.gradientStops.forEach(function(s,i){if(Math.abs(s.pos-p)<.03)hit=i})
+    if(hit>=0){var v=document.getElementById('stop-color').value
+      state.gradientStops[hit].color=[parseInt(v.slice(1,3),16),parseInt(v.slice(3,5),16),parseInt(v.slice(5,7),16)]
+      draw();doPreview()}
+  }
+  document.getElementById('stop-color').onchange=function(){
+    var v=this.value,last=state.gradientStops[state.gradientStops.length-1]
+    last.color=[parseInt(v.slice(1,3),16),parseInt(v.slice(3,5),16),parseInt(v.slice(5,7),16)]
+    draw();doPreview()
+  }
+  draw()
+}
 
-  // 初始化默认效果
-  (function init() {
-    var def = DEFS[state.tab]
-    state.effect = def.effects[0].id
-    def.effects[0].params.forEach(function (p) { state.params[p[0]] = p[5] })
+// ---- 选区页 ----
+function renderSelectionPanel(box) {
+  var tools=[['rect','矩形'],['ellipse','椭圆'],['lasso','套索'],['magicWand','魔棒'],['pen','钢笔']]
+  box.innerHTML='<h3>选区</h3><div class="grid">'+tools.map(function(t){
+    return '<button data-seltool="'+t[0]+'"'+(t[0]===state.selectionTool?' class="active"':'')+'>'+t[1]+'</button>'
+  }).join('')+'</div><h4>操作</h4><div class="actions"><button id="sel-feather">羽化</button>' +
+    '<button id="sel-invert">反选</button><button id="sel-clear">清除</button></div>' +
+    '<div class="row"><label>羽化半径<span id="feather-val">4</span></label>' +
+    '<input type="range" id="feather" min="0" max="40" value="4"></div>' +
+    '<div class="note">在画布上拖拽创建矩形/椭圆/套索；魔棒与钢笔单击取点。效果只作用于选区。' +
+    '<br>Shift+拖 = 矩形，Ctrl+Shift+拖 = 椭圆，Alt+Shift+拖 = 套索。</div>' +
+    '<div class="actions"><button id="btn-preview">预览选区效果</button><button id="btn-apply" class="primary">应用选区效果</button></div>'
+  box.querySelectorAll('[data-seltool]').forEach(function(b){b.onclick=function(){state.selectionTool=b.dataset.seltool;renderParams()}})
+  document.getElementById('sel-feather').onclick=function(){send('selection',{op:'feather',radius:Number(document.getElementById('feather').value)})}
+  document.getElementById('sel-invert').onclick=function(){send('selection',{op:'invert'})}
+  document.getElementById('sel-clear').onclick=function(){send('selection',{op:'clear'})}
+  document.getElementById('feather').oninput=function(){document.getElementById('feather-val').textContent=this.value}
+  document.getElementById('btn-preview').onclick=doPreview
+  document.getElementById('btn-apply').onclick=function(){doApply(true)}
+}
+
+// ---- 工具箱 ----
+function renderTools(box) {
+  box.innerHTML='<h3>工具箱</h3>' +
+    '<h4>历史记录</h4><div class="list" id="history-list"></div>' +
+    '<h4>统计</h4><div id="stats-box" class="note"></div><div class="actions"><button id="stats-reset">清零</button></div>' +
+    '<h4>Lab 取色器</h4><canvas id="lab-plane" class="editor" width="262" height="150"></canvas>' +
+    '<div class="row"><label>L 明度<span id="lab-l-val">60</span></label><input type="range" id="lab-l" min="0" max="100" value="60"></div>' +
+    '<div class="note" id="lab-info"></div>' +
+    '<h4>三角色盘</h4><canvas id="triad" class="editor" width="262" height="180"></canvas>' +
+    '<div class="note" id="triad-info"></div>' +
+    '<h4>动作</h4><div class="row checkbox"><label><input type="checkbox" id="recording"'+(state.recording?' checked':'')+'> 录制效果链</label></div>' +
+    '<div class="list" id="action-list"></div>' +
+    '<div class="actions"><button id="action-replay">回放</button><button id="action-save">保存</button><button id="action-load">加载</button></div>' +
+    '<h4>外观</h4><div class="row"><label>强调色</label><input type="color" id="accent" value="'+state.accent+'"></div>' +
+    '<div class="row"><label>字体缩放<span id="font-val">'+Math.round(state.fontScale*100)+'%</span></label>' +
+    '<input type="range" id="font" min="90" max="120" step="10" value="'+Math.round(state.fontScale*100)+'"></div>' +
+    '<div class="row"><label>快捷键方案</label><select id="hotkeys"><option>Ctrl+Alt</option><option>Ctrl+Shift</option><option>Alt+Shift</option></select></div>'
+  renderHistory();renderStats();renderActions();setupLab();setupTriad()
+  document.getElementById('stats-reset').onclick=function(){send('stats',{reset:true})}
+  document.getElementById('lab-l').oninput=function(){
+    state.lab.L=Number(this.value);document.getElementById('lab-l-val').textContent=this.value
+    request('color',{from:'lab',value:[state.lab.L,state.lab.a,state.lab.b]},function(r){
+      if(r&&r.hex)state.lab.hex=r.hex;updateLabInfo()})
+  }
+  document.getElementById('recording').onchange=function(){state.recording=!!this.checked;send('actionRecord',{on:state.recording})}
+  document.getElementById('action-replay').onclick=function(){send('actionReplay')}
+  document.getElementById('action-save').onclick=function(){send('actionSave')}
+  document.getElementById('action-load').onclick=function(){send('actionLoad')}
+  document.getElementById('accent').onchange=function(){state.accent=this.value;applyAppearance()}
+  document.getElementById('font').oninput=function(){state.fontScale=Number(this.value)/100
+    document.getElementById('font-val').textContent=this.value+'%';applyAppearance()}
+  document.getElementById('hotkeys').value=state.hotkeys
+  document.getElementById('hotkeys').onchange=function(){state.hotkeys=this.value;applyAppearance()}
+}
+function applyAppearance(){
+  document.documentElement.style.setProperty('--font-scale',state.fontScale)
+  document.documentElement.style.setProperty('--fx-accent',state.accent)
+  send('appearance',{accent:state.accent,fontScale:state.fontScale,hotkeys:state.hotkeys})
+}
+function renderHistory(){
+  var el=document.getElementById('history-list');if(!el)return
+  el.innerHTML=state.history.length?state.history.map(function(h,i){return '<div data-h="'+h.index+'">'+h.label+'</div>'}).join(''):'<div class="note">暂无历史</div>'
+  el.querySelectorAll('[data-h]').forEach(function(d){d.onclick=function(){send('historyRevert',{index:Number(d.dataset.h)})}})
+}
+function renderStats(){
+  var el=document.getElementById('stats-box');if(!el)return
+  el.textContent='应用 '+state.stats.ops+' 次 · 涂抹 '+state.stats.strokes+' 笔 · 撤销 '+(state.stats.undos||0)+' 次'
+}
+function renderActions(){
+  var el=document.getElementById('action-list');if(!el)return
+  el.innerHTML=state.actions.length?state.actions.map(function(a){return '<div>'+a+'</div>'}).join(''):'<div class="note">暂无动作</div>'
+}
+function hsvToRgb(h,s,v){
+  var c=v*s,x=c*(1-Math.abs((h/60)%2-1)),m=v-c,r,g,b
+  if(h<60){r=c;g=x;b=0}else if(h<120){r=x;g=c;b=0}else if(h<180){r=0;g=c;b=x}
+  else if(h<240){r=0;g=x;b=c}else if(h<300){r=x;g=0;b=c}else{r=c;g=0;b=x}
+  return [Math.round((r+m)*255),Math.round((g+m)*255),Math.round((b+m)*255)]
+}
+function setupLab(){
+  var c=document.getElementById('lab-plane');if(!c)return
+  var ctx=c.getContext('2d')
+  request('colorPlane',{L:state.lab.L,w:c.width,h:c.height},function(r){
+    if(r&&r.dataUrl){var im=new Image();im.onload=function(){ctx.drawImage(im,0,0)};im.src=r.dataUrl}
+  })
+  c.onclick=function(e){
+    var r=c.getBoundingClientRect()
+    state.lab.a=((e.clientX-r.left)/r.width-0.5)*200
+    state.lab.b=((e.clientY-r.top)/r.height-0.5)*200
+    request('color',{from:'lab',value:[state.lab.L,state.lab.a,state.lab.b]},function(res){
+      if(res&&res.hex){state.lab.hex=res.hex;updateLabInfo();toast('取到 '+res.hex+'，可在 SAI2 取色器输入')}
+    })
+  }
+  updateLabInfo()
+}
+function updateLabInfo(){
+  var el=document.getElementById('lab-info');if(el)
+    el.textContent='L '+Math.round(state.lab.L)+' · a '+state.lab.a.toFixed(0)+' · b '+state.lab.b.toFixed(0)+(state.lab.hex?' · '+state.lab.hex:'')
+}
+function setupTriad(){
+  var c=document.getElementById('triad');if(!c)return
+  var ctx=c.getContext('2d')
+  function css(h,s,v){return 'rgb('+hsvToRgb(h,s,v).join(',')+')'}
+  function draw(){
+    ctx.clearRect(0,0,c.width,c.height)
+    var cx=c.width/2,cy=c.height-12,R=Math.min(c.width/2-8,c.height-24)
+    for(var a=0;a<360;a+=2){ctx.strokeStyle='hsl('+a+',100%,50%)';ctx.lineWidth=2
+      ctx.beginPath();ctx.arc(cx,cy,R,(a-1)*Math.PI/180,(a+1)*Math.PI/180);ctx.stroke()}
+    ctx.fillStyle=css(state.triadH,0,1);ctx.beginPath()
+    ctx.moveTo(cx,cy-R);ctx.lineTo(cx-R,cy);ctx.lineTo(cx+R,cy);ctx.fill()
+    var g=ctx.createLinearGradient(cx-R,cy,cx+R,cy)
+    g.addColorStop(0,css(state.triadH,1,0));g.addColorStop(1,'rgba(0,0,0,0)')
+    ctx.globalCompositeOperation='source-atop';ctx.fillStyle=g;ctx.fillRect(0,0,c.width,c.height)
+    ctx.globalCompositeOperation='source-over'
+    var x=cx+(state.triadS-0.5)*R,y=cy-(1-state.triadV)*R
+    ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,5,0,7);ctx.stroke()
+    var rgb=hsvToRgb(state.triadH,state.triadS,state.triadV)
+    document.getElementById('triad-info').textContent='H '+state.triadH+'° S '+state.triadS.toFixed(2)+' V '+state.triadV.toFixed(2)+
+      ' · #'+rgb.map(function(n){return n.toString(16).padStart(2,'0')}).join('').toUpperCase()
+  }
+  c.onclick=function(e){
+    var r=c.getBoundingClientRect(),cx=c.width/2,cy=c.height-12,R=Math.min(c.width/2-8,c.height-24)
+    var x=(e.clientX-r.left)*(c.width/r.width),y=(e.clientY-r.top)*(c.height/r.height)
+    var dx=x-cx,dy=y-cy,ang=Math.atan2(dy,dx)*180/Math.PI+90
+    if(Math.hypot(dx,dy)>R*0.9){state.triadH=(ang+360)%360}
+    else{state.triadS=Math.max(0,Math.min(1,dx/R+0.5));state.triadV=Math.max(0,Math.min(1,1-dy/R))}
+    draw()
+  }
+  draw()
+}
+
+// ---- 画布：预览 / 液化笔画 / 选区 ----
+function paint(){
+  if(!state.imageUrl)return
+  var img=new Image()
+  img.onload=function(){
+    var pv=document.getElementById('preview'),ov=document.getElementById('overlay'),area=document.getElementById('canvas-area')
+    var maxW=Math.max(80,area.clientWidth-24),maxH=Math.max(80,area.clientHeight-24)
+    var fit=Math.min(1,maxW/img.width,maxH/img.height),s=fit*state.zoom/100
+    pv.width=Math.max(1,Math.round(img.width*s));pv.height=Math.max(1,Math.round(img.height*s))
+    pv.getContext('2d').drawImage(img,0,0,pv.width,pv.height)
+    pv.style.display='block';document.getElementById('empty').style.display='none'
+    pv.style.left=Math.round((area.clientWidth-pv.width)/2)+'px'
+    pv.style.top=Math.round((area.clientHeight-pv.height)/2)+'px'
+    ov.style.left=pv.style.left;ov.style.top=pv.style.top
+  }
+  img.src=state.imageUrl
+}
+function canvasPoint(e){
+  var r=document.getElementById('preview').getBoundingClientRect()
+  return {x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}
+}
+function bindCanvas(){
+  var area=document.getElementById('canvas-area'),last=null,dragTool=null,dragPts=null
+  area.addEventListener('pointerdown',function(e){
+    if(!state.hasImage)return
+    var p=canvasPoint(e)
+    if(state.page==='liquify'){
+      last=p
+      send('liquifyStroke',{tool:state.effect,from:p,to:p,radius:Number(state.params.radius||24),amount:Number(state.params.amount||1)})
+      state.stats.strokes++;renderStats()
+    }else if(state.page==='selection'){
+      last=p;dragPts=[p]
+      dragTool=e.altKey?'lasso':(e.ctrlKey&&e.shiftKey?'ellipse':(e.shiftKey?'rect':state.selectionTool))
+    }
+  })
+  area.addEventListener('pointermove',function(e){
+    if(!last)return
+    var p=canvasPoint(e)
+    if(state.page==='liquify'){
+      send('liquifyStroke',{tool:state.effect,from:last,to:p,radius:Number(state.params.radius||24),amount:Number(state.params.amount||1)})
+      last=p
+    }else if(state.page==='selection'&&dragPts)dragPts.push(p)
+  })
+  window.addEventListener('pointerup',function(e){
+    if(!last)return
+    if(state.page==='selection'&&dragPts){
+      var p=canvasPoint(e)
+      if(dragTool==='magicWand'||dragTool==='pen')send('selection',{op:dragTool,points:dragPts})
+      else send('selection',{op:dragTool,from:dragPts[0],to:p,points:dragPts})
+      state.selectionActive=true
+    }
+    last=null;dragPts=null;dragTool=null
+  })
+}
+
+// ---- 图层 / 事件 ----
+function renderLayers(){
+  var box=document.getElementById('layer-list')
+  if(!state.layers.length){box.innerHTML='<div class="note">'+(state.agentOk?'未识别到图层，先在 SAI2 点一下图层面板':'未连接注入器，点「连接注入」')+'</div>';return}
+  box.innerHTML=''
+  state.layers.forEach(function(r,i){
+    var d=document.createElement('div');d.className='layer-row'+(i===state.sel?' sel':'')
+    d.textContent='#'+(i+1)+'  '+r.text
+    d.onclick=function(){state.sel=i;renderLayers();send('selectLayer',{index:i,row:r})}
+    box.appendChild(d)
+  })
+}
+document.getElementById('side').querySelectorAll('button[data-page]').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#side button').forEach(function(x){x.classList.remove('active')})
+    b.classList.add('active');state.page=b.dataset.page
+    if(DEFS[state.page]&&!DEFS[state.page].effects.length)state.effect=''
     renderParams()
-  })()
-
-  // 接收插件消息
-  if (bridge) {
-    bridge.onMessage(function (msg) {
-      if (!msg || !msg.type) return
-      switch (msg.type) {
-        case 'layers':
-          state.layers = msg.layers || []
-          state.agentOk = !!msg.ok
-          document.getElementById('status-agent').textContent = msg.ok ? '注入器已连接' : '未连接注入器'
-          renderLayers()
-          break
-        case 'grabbed':
-          state.imgW = msg.width || 0
-          state.imgH = msg.height || 0
-          document.getElementById('status-image').textContent =
-            state.imgW && state.imgH ? ('已抓取图层 ' + state.imgW + ' x ' + state.imgH) : '尚未抓取图层'
-          break
-        case 'image':
-          showImage(msg.dataUrl)
-          break
-        case 'status':
-          toast(msg.text || '')
-          break
-        case 'cleared':
-          showImage(null)
-          break
-      }
-    })
   }
+})
+document.getElementById('btn-close').onclick=function(){send('close')}
+document.getElementById('btn-refresh').onclick=function(){send('refreshLayers')}
+document.getElementById('btn-inject').onclick=function(){toast('正在连接注入器…');send('inject')}
+document.getElementById('btn-whitelist').onclick=function(){toast('请在 UAC 弹窗中确认');send('whitelist')}
+document.getElementById('btn-grab').onclick=function(){send('grab')}
+var toolMenu=document.getElementById('tool-menu')
+document.getElementById('btn-tools').onclick=function(e){e.stopPropagation();toolMenu.classList.toggle('show')}
+document.addEventListener('click',function(e){if(!toolMenu.contains(e.target)&&e.target.id!=='btn-tools')toolMenu.classList.remove('show')})
+toolMenu.querySelectorAll('button[data-page]').forEach(function(b){b.onclick=function(){
+  toolMenu.classList.remove('show')
+  document.querySelector('#side button[data-page="'+b.dataset.page+'"]').click()
+}})
+toolMenu.querySelectorAll('button[data-tool]').forEach(function(b){b.onclick=function(){
+  toolMenu.classList.remove('show');var t=b.dataset.tool
+  if(t==='gray'){state.gray=!state.gray;document.getElementById('canvas-area').classList.toggle('gray',state.gray);toast(state.gray?'已切黑白预览':'已恢复彩色');return}
+  if(t==='gradient'){
+    document.querySelector('#side button[data-page="adjust"]').click()
+    state.effect='gradientMap'; state.params={}; renderParams(); return
+  }
+  if(['history','stats','lab','triad','actions','appearance'].indexOf(t)>=0){
+    document.querySelector('#side button[data-page="tools"]').click()
+    setTimeout(function(){var el=document.getElementById(t==='history'?'history-list':t==='stats'?'stats-box':t)
+      if(el)el.scrollIntoView({block:'center'})},30)
+    return
+  }
+  send('openSuitePanel',{tool:t});toast('正在打开原生工具：'+b.textContent)
+}})
+var zoomEl=document.getElementById('zoom')
+zoomEl.oninput=function(){state.zoom=Number(this.value);document.getElementById('zoom-label').textContent=state.zoom+'%';paint()}
+document.getElementById('btn-fit').onclick=function(){state.zoom=100;zoomEl.value='100';document.getElementById('zoom-label').textContent='100%';paint()}
+bindCanvas()
+
+if (bridge) bridge.onMessage(function(msg){
+  if(!msg||!msg.type)return
+  if(msg.requestId&&state.pending[msg.requestId]){var cb=state.pending[msg.requestId];delete state.pending[msg.requestId];cb(msg);return}
+  switch(msg.type){
+    case 'layers': state.layers=msg.layers||[];state.agentOk=!!msg.ok
+      document.getElementById('status-agent').textContent=msg.ok?'注入器已连接':'未连接注入器';renderLayers();break
+    case 'image': state.imageUrl=msg.dataUrl;paint();break
+    case 'grabbed': document.getElementById('status-image').textContent='已抓取图层 '+msg.width+' x '+msg.height;break
+    case 'status': toast(msg.text||'');break
+    case 'history': state.history=msg.list||[];renderHistory();break
+    case 'stats': state.stats=msg.stats||state.stats;renderStats();break
+    case 'actions': state.actions=msg.list||[];renderActions();break
+    case 'filterList': state.filterThumbs={};msg.list.forEach(function(f){state.filterThumbs[f.id]=f})
+      msg.list.forEach(function(f){send('thumb',{id:f.id})})
+      if(state.page==='filter')renderParams();break
+    case 'thumb': if(state.filterThumbs[msg.id])state.filterThumbs[msg.id].dataUrl=msg.dataUrl
+      if(state.page==='filter')renderFilterGrid();break
+    case 'mask': var ov=document.getElementById('overlay')
+      if(msg.dataUrl&&state.imageUrl){var im=new Image();im.onload=function(){
+        ov.width=document.getElementById('preview').width;ov.height=document.getElementById('preview').height
+        ov.getContext('2d').clearRect(0,0,ov.width,ov.height);ov.getContext('2d').drawImage(im,0,0,ov.width,ov.height)
+        ov.style.display='block'};im.src=msg.dataUrl}
+      else ov.style.display='none'
+      break
+    case 'cleared': state.imageUrl=null;document.getElementById('preview').style.display='none'
+      document.getElementById('empty').style.display='block';break
+  }
+})
+
+send('filterList')
+renderParams()
 })()
 </script>
 </body>

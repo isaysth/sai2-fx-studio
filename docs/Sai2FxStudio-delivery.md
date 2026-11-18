@@ -1,9 +1,30 @@
 # SAI2 FX Studio · 交付说明（T7.1~T7.10）
 
+## v0.3.0 · 按原方案重做 UI 层与引擎（2026-11-18）
+
+- 用户指出 v0.2.0 走捷径（只把上游面板接进来），要求按原方案做我们自己的 UI/引擎。
+- **UI 层重写**：`ui/panel.html` 全新实现——七页导航（液化/模糊/滤镜/调整/选区/工具箱/关于）、
+  工具 ▾ 菜单、画布笔画交互、曲线编辑器、渐变编辑器、滤镜缩略图墙、Lab/HSV 色域控件、
+  历史/统计/动作面板、外观设置。
+- **引擎扩展**：`algorithms/adjust.js` 补齐阈值/色调分离/色彩平衡/渐变映射/曲线；
+  `algorithms/blur.js` 补齐径向/表面/特殊/镜头/平均/透视；`algorithms/filters.js`
+  扩到 53 个不同滤镜并导出 `FILTER_LIST`；`algorithms/liquify.js` 补齐 8 工具与
+  `stroke()` 调度。新增 `core/selection.js`（矩形/椭圆/套索/魔棒/钢笔/羽化/反选）、
+  `core/color.js`（RGB/HSV/Lab/HEX/渐变插值）、`core/history.js`（撤销/重做/回退）、
+  `core/actions.js`（动作录制/序列化/回放）。所有新算法支持选区掩码混合。
+- **消息路由**：`index.js` 新增 `liquifyStroke` / `selection` / `color` / `colorPlane` /
+  `filterList` / `thumb` / `historyRevert` / `redo` / `stats` / `action*` / `appearance`。
+- **验证**：`npm test` —— 核心工具 18 项、算法 39 项、装配冒烟 8 组全部通过；
+  `node --check` 主入口与浮窗内嵌 JS 通过。
+- **仍由随包上游组件提供**：笔刷导入、画布盖印、穿透橡皮、画布黑白覆盖、缩时摄影
+  （需要写 SAI2 安装目录或屏幕捕获，纯 JS 引擎无法独立完成）。
+
+> 以下为历史交付记录。
+
 ## v0.2.0 · 独立拆分 + 完整工具面板补齐（2026-11-18）
 
 - **项目拆分**：插件源码从 `sai2工作台/contrib/sai2-fx-studio/` 移到独立项目
-  `C:\Users\11421\Documents\sai2-fx-studio\`；工作台仓库只保留插件 API，
+  `C:\Users\11421\Documents\sai2工作台\sai2-fx-studio\`；工作台仓库只保留插件 API，
   README 已注明新位置。原路径 45 个文件已通过 `git rm` 从工作台移除（可从 git 历史恢复），
   工作台自身的未提交改动未触碰。
 - **用户反馈**：原包只有轻量四页浮窗，缺「工具 ▾」与截图里的多数基础功能。
