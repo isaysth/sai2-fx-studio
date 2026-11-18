@@ -510,6 +510,35 @@ function apply(ctx, config) {
     } catch { return '未知' }
   }
 
+  /**
+   * 侧栏单工具页：直接复用浮窗 UI，只在 <head> 后注入一段启动脚本，
+   * 让页面一打开就停在对应页签，并隐藏左侧 92px 导航。不改 HTML 结构。
+   */
+  const TOOL_PAGES = [
+    { id: 'fx-blur', page: 'blur', title: '模糊' },
+    { id: 'fx-adjust', page: 'adjust', title: '调整' },
+    { id: 'fx-filter', page: 'filter', title: '滤镜' },
+    { id: 'fx-liquify', page: 'liquify', title: '液化' },
+    { id: 'fx-selection', page: 'selection', title: '选区' }
+  ]
+
+  /** 浮窗 UI 源码：apply 时读一次，5 个工具页共用（读不到返回 null） */
+  function readPanelSource() {
+    try {
+      return fs.readFileSync(path.join(__dirname, 'ui', 'panel.html'), 'utf8')
+    } catch (err) {
+      log.warn(`${PLUGIN_ID} 读取浮窗界面失败：${err.message}`)
+      return null
+    }
+  }
+
+  /** 生成单工具页：注入 __FX_INITIAL_PAGE / __FX_SOLO，页面自己读取这两个全局量 */
+  function panelHtml(pageKey) {
+    if (!panelSource) return null
+    const boot = `<script>window.__FX_INITIAL_PAGE='${pageKey}';window.__FX_SOLO=1</script>`
+    return panelSource.replace('<head>', '<head>\n' + boot)
+  }
+
   /** 读面板 HTML 并替换占位符；读不到返回 null（apply 时只读这一次） */
   function manageHtml() {
     const file = path.join(__dirname, 'ui', 'manage.html')
@@ -708,42 +737,46 @@ function apply(ctx, config) {
   }
 
   // ---- 注册贡献点 ----
-  // 管理面板：html 在此处读一次并注入版本/状态，之后不再读盘
+  // 管理面板 + 5 个工具页：html 在此处读一次并注入版本/状态，之后不再读盘
   const managePage = manageHtml()
-  if (managePage) {
-    if (typeof ctx.addPage === 'function') {
-      ctx.addPage({ id: MANAGE_PAGE_ID, title: '特效工坊', html: managePage })
-    } else {
-      ctx.setStatus('当前工作台版本不支持插件页面，请升级 sai2工作台', 'warn')
+  const panelSource = readPanelSource()
+  if (typeof ctx.addPage === 'function') {
+    if (managePage) ctx.addPage({ id: MANAGE_PAGE_ID, title: '特效工坊', html: managePage })
+    for (const tool of TOOL_PAGES) {
+      const html = panelHtml(tool.page)
+      if (html) ctx.addPage({ id: tool.id, title: tool.title, html })
+      else log.warn(`${PLUGIN_ID} 生成工具页失败：${tool.id}`)
     }
+  } else {
+    ctx.setStatus('当前工作台版本不支持插件页面，请升级 sai2工作台', 'warn')
   }
 
+  // 主操作只留 3 条：一键开始 / 完整工具面板 / 打开浮窗（D-020）。
+  // 注意：工作台的插件页面按钮只能触发 addToolbarAction 注册过的 id
+  // （渲染端 runAction('toolbar', id)），所以下面 3 条「管理页后端」仍须注册，
+  // 否则 ui/manage.html 的按钮会回「动作不存在」。当前工作台不渲染工具栏动作列表，
+  // 这些注册项不会出现在任何可见工具栏上。
+  ctx.addToolbarAction({
+    id: 'fx-launch-pair',
+    label: '一键开始',
+    run: () => launchPair()
+  })
   ctx.addToolbarAction({
     id: 'suite-open',
     label: 'SAI2 工具面板',
     run: () => { void openSuitePanel() }
   })
   ctx.addToolbarAction({
-    id: 'fx-open',
-    label: '特效工坊（浮窗）',
-    run: () => openWindow()
+    id: 'fx-open-panel',
+    label: '打开浮窗',
+    run: () => { openWindow() }
   })
-  // 管理面板用的动作：页面按钮发的 id 必须与这里完全一致（tests/manage-panel.test.js 校验）
+  // 管理页后端动作：面板按钮发的 id 必须与这里完全一致（tests/manage-panel.test.js 校验）
   // run 返回 Promise，失败时抛错，工作台才能把 error 回执给面板
-  ctx.addToolbarAction({
-    id: 'fx-launch-pair',
-    label: 'FX：一键开始',
-    run: () => launchPair()
-  })
   ctx.addToolbarAction({
     id: 'fx-launch-sai2',
     label: 'FX：启动 SAI2',
     run: () => launchSai2()
-  })
-  ctx.addToolbarAction({
-    id: 'fx-open-panel',
-    label: 'FX：打开浮窗',
-    run: () => { openWindow() }
   })
   ctx.addToolbarAction({
     id: 'fx-open-dir',

@@ -42,6 +42,7 @@ button { cursor: pointer; }
   padding: 8px 10px; border-radius: 8px; font-size: 12px;
 }
 .side button.active { background: var(--panel2); color: var(--text); box-shadow: inset 2px 0 var(--accent); }
+.side[hidden] { display: none; }
 .side .foot { margin-top: auto; font-size: 10px; color: var(--dim); padding: 6px; line-height: 1.5; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .canvas-area {
@@ -124,6 +125,15 @@ button { cursor: pointer; }
 }
 .toast.show { opacity: 1; }
 .note { color: var(--dim); font-size: 10px; line-height: 1.6; }
+.solo-hint {
+  flex: none; display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: var(--panel2); border-bottom: 1px solid var(--line); color: var(--dim); font-size: 11px;
+}
+.solo-hint[hidden] { display: none; }
+.solo-hint button {
+  margin-left: auto; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+  border-radius: 5px; padding: 2px 9px; font-size: 11px;
+}
 </style>
 </head>
 <body>
@@ -160,6 +170,10 @@ button { cursor: pointer; }
     <div class="foot">原创 UI / JS 引擎<br>算法移植自 MIT 项目</div>
   </nav>
   <div class="main">
+    <div class="solo-hint" id="solo-hint" hidden>
+      <span>侧栏页只展示界面，抓图 / 预览 / 应用请在浮窗里操作。</span>
+      <button id="solo-open">打开浮窗</button>
+    </div>
     <div class="canvas-area" id="canvas-area">
       <canvas id="preview" style="display:none"></canvas>
       <canvas id="overlay" style="display:none"></canvas>
@@ -185,8 +199,13 @@ button { cursor: pointer; }
 (function () {
 'use strict'
 var bridge = window.pluginBridge
+// 侧栏单工具页由 index.js 的 panelHtml() 在 <head> 后注入：
+//   window.__FX_INITIAL_PAGE = 'blur' 等页签名；window.__FX_SOLO = 1 表示隐藏左侧导航
+var INITIAL_PAGE = typeof window.__FX_INITIAL_PAGE === 'string' && window.__FX_INITIAL_PAGE
+  ? window.__FX_INITIAL_PAGE : 'liquify'
+var SOLO = window.__FX_SOLO === 1
 var state = {
-  page: 'liquify', effect: '', params: {}, layers: [], sel: -1, hasImage: false, agentOk: false,
+  page: INITIAL_PAGE, effect: '', params: {}, layers: [], sel: -1, hasImage: false, agentOk: false,
   zoom: 100, imageUrl: null, imgW: 0, imgH: 0, gray: false, autoPaste: true,
   filterThumbs: {}, filterGroup: '全部', selectionTool: 'rect', selectionActive: false,
   history: [], stats: { ops: 0, strokes: 0, undos: 0 }, actions: [], recording: false,
@@ -195,7 +214,7 @@ var state = {
   accent: '#7aa2ff', fontScale: 1, hotkeys: 'Ctrl+Alt', reqId: 0, pending: {}
 }
 function send(type, extra) {
-  if (!bridge) return toast('浮窗通信未就绪')
+  if (!bridge) return toast(SOLO ? '侧栏页只做展示，请在浮窗里操作' : '浮窗通信未就绪')
   var msg = { type: type }
   if (extra) for (var k in extra) msg[k] = extra[k]
   bridge.send(msg)
@@ -709,7 +728,24 @@ if (bridge) bridge.onMessage(function(msg){
   }
 })
 
-send('filterList')
+// 单工具页：隐藏导航，把高亮落到注入的页签上
+if (SOLO) {
+  document.getElementById('side').hidden = true
+  if (!bridge) {
+    // 侧栏页跑在沙箱 iframe 里，拿不到 pluginBridge，只做界面展示
+    var soloHint = document.getElementById('solo-hint')
+    if (soloHint) soloHint.hidden = false
+    var soloOpen = document.getElementById('solo-open')
+    if (soloOpen) soloOpen.onclick = function () {
+      window.parent.postMessage({ __sai2Page: 'action', id: 'fx-open-panel' }, '*')
+    }
+  }
+}
+document.querySelectorAll('#side button[data-page]').forEach(function (b) {
+  b.classList.toggle('active', b.dataset.page === state.page)
+})
+
+if (bridge) send('filterList')
 renderParams()
 })()
 </script>

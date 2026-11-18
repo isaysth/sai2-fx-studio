@@ -35,14 +35,16 @@ async function main() {
 
   const toolbar = []
   const files = []
+  const pages = []
   const statuses = []
   let onMessage = null
   const ctx = {
-    log: { info() {}, error() {} },
+    log: { info() {}, warn() {}, error() {} },
     setStatus: (text) => statuses.push(text),
     dialog: { error() {} },
     addToolbarAction: (a) => toolbar.push(a),
     addFileAction: (a) => files.push(a),
+    addPage: (p) => pages.push(p),
     windows: {
       open: (opts) => { onMessage = opts.onMessage; return { ok: true } },
       post() {},
@@ -53,12 +55,34 @@ async function main() {
   plugin.apply(ctx, { version: manifest.version, autoInject: false })
 
   const suiteAction = toolbar.find((a) => a.id === 'suite-open')
-  const lightAction = toolbar.find((a) => a.id === 'fx-open')
+  const windowAction = toolbar.find((a) => a.id === 'fx-open-panel')
   assert.ok(suiteAction, '缺少工具栏动作：SAI2 工具面板')
-  assert.ok(lightAction, '缺少工具栏动作：特效工坊（浮窗）')
+  assert.ok(windowAction, '缺少工具栏动作：打开浮窗')
   assert.equal(suiteAction.label, 'SAI2 工具面板')
 
-  lightAction.run()
+  // 主操作只剩三条（其余入口在侧栏页面 / 管理页）
+  for (const id of ['fx-launch-pair', 'suite-open', 'fx-open-panel']) {
+    assert.ok(toolbar.some((a) => a.id === id), `缺少主工具栏动作：${id}`)
+  }
+  assert.ok(!toolbar.some((a) => a.id === 'fx-open'), '旧的重名浮窗动作 fx-open 应已移除')
+
+  // 侧栏工具页：5 个独立入口 + 管理页，共 6 个 addPage（D-020 / N-029）
+  const expectedPages = [
+    ['fx-blur', '模糊'], ['fx-adjust', '调整'], ['fx-filter', '滤镜'],
+    ['fx-liquify', '液化'], ['fx-selection', '选区']
+  ]
+  for (const [id, title] of expectedPages) {
+    const page = pages.find((p) => p.id === id)
+    assert.ok(page, `缺少侧栏工具页：${id}`)
+    assert.equal(page.title, title, `${id} 的标题应为 ${title}`)
+    assert.ok(page.html.includes("window.__FX_INITIAL_PAGE='" + id.replace('fx-', '') + "'"),
+      `${id} 的页面应注入对应的 __FX_INITIAL_PAGE`)
+    assert.ok(page.html.includes('window.__FX_SOLO=1'), `${id} 应注入 __FX_SOLO`)
+  }
+  assert.ok(pages.some((p) => p.id === 'manage'), '缺少管理页 manage')
+  assert.equal(pages.length, 6, '共应有 6 个页面（管理页 + 5 工具页）')
+
+  windowAction.run()
   assert.equal(typeof onMessage, 'function', '轻量浮窗应注册消息处理器')
 
   await suiteAction.run()
