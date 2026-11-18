@@ -33,6 +33,16 @@
 - **网盘镜像**（国内更快）：https://pan.baidu.com/s/1y2_qD1zGCAg1qLJfIs-BwA?pwd=hos7 （提取码 `hos7`，四个包同一文件夹）
 - **验证状态**：算法断言与冒烟断言均通过；**真机闭环待点验**，清单见 sai2工作台仓库外的 `文档\交付与发布\验证清单\FX真机验证清单.md`
 
+## 管理面板
+
+在左侧侧栏的插件页面里打开 **FX Studio**（`ui/manage.html`），不用先去工具栏找入口。面板能做：
+
+- **一键开始**：启动 SAI2，等约 1.5 秒再打开 FX 浮窗并自动注入（`fx-launch-pair`）
+- **只启动 SAI2** / **只打开浮窗** / **连接注入器**（`fx-launch-sai2` / `fx-open-panel` / `fx-connect`）
+- **打开插件目录** / **完整工具面板**（`fx-open-dir` / 复用工具栏的 `suite-open`）
+
+底部有首次使用提示（杀软白名单、管理员权限、SAI2 需先开着）与套件/注入器/浮窗三块状态。面板里的按钮通过 `postMessage` 触发插件注册的动作，**需要工作台已支持插件页面动作桥**（工作台提交 `1d57a3b` 及之后）。在更早的工作台上，面板能显示、按钮点了没有反馈——升级工作台即可。
+
 ## 安装（只需一步）
 
 在工作台「插件」页点「安装」→ 选择 `sai2-fx-studio-0.3.0.zip`。
@@ -90,12 +100,12 @@
 
 ```bash
 cd sai2-fx-studio
-npm test          # 核心工具 18 项 + 算法 39 项 + 装配/消息路由冒烟测试
+npm test          # 核心工具 18 项 + 算法 39 项 + 装配/消息路由冒烟 + 管理面板静态检查
 npm run build     # 生成 dist/sai2-fx-studio-<version>.zip
 ```
 
 目录：`index.js`（插件入口/消息路由）、`core/`（agent、剪贴板、桌面桥、工具面板启动）、
-`algorithms/`（JS 算法）、`ui/panel.html`（轻量浮窗）、`vendor/sai2-plugin-suite/`
+`algorithms/`（JS 算法）、`ui/panel.html`（轻量浮窗）、`ui/manage.html`（侧栏管理面板）、`vendor/sai2-plugin-suite/`
 （上游套件，原样分发）、`docs/`（本插件独立的规划/交付文档）、`scripts/build.js`（打包）。
 
 **独立开发约定**：本项目与 sai2工作台 是两个独立仓库，各自提交、构建、发版。

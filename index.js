@@ -29,6 +29,10 @@ const { FILTER_LIST } = require('./algorithms/filters.js')
 const PLUGIN_ID = 'sai2-fx-studio'
 const PREVIEW_MAX_DIM = 900
 
+// 面板上展示的版本号：apply 的 config 里没有 version，优先读清单
+let PLUGIN_VERSION = '0.0.0'
+try { PLUGIN_VERSION = require('./plugin.json').version || PLUGIN_VERSION } catch { /* 清单缺失时退回首版号 */ }
+
 function apply(ctx, config) {
   const log = ctx.log
   const session = new Session({ previewMaxDim: PREVIEW_MAX_DIM })
@@ -69,7 +73,7 @@ function apply(ctx, config) {
       ctx.setStatus(isBundled() ? '内置套件文件缺失，请重新安装插件' : '套件目录缺少注入器，请重新选择', 'error')
       return false
     }
-    ctx.setStatus(isBundled() ? '内置套件就绪（v1.64.0）' : '自定义套件就绪', 'ok')
+    ctx.setStatus(suiteStatusLabel(), 'ok')
     return true
   }
 
@@ -491,6 +495,90 @@ function apply(ctx, config) {
     if (file) toast('已选择文件：' + file + '（请在 SAI2 中打开后抓取）')
   }
 
+  // ---- 管理面板：启动 SAI2 / 一键联动（页面动作桥，见工作台 D-012）----
+  const MANAGE_PAGE_ID = 'manage'
+  const PAIR_DELAY_MS = 1500 // SAI2 启动需要时间，太早开浮窗注入会打空
+
+  function suiteStatusLabel() {
+    return isBundled() ? '内置套件就绪（v1.64.0）' : '自定义套件就绪'
+  }
+
+  /** 面板「套件状态」卡片的初值：只读文件，不重复上报状态 */
+  function panelStatusText() {
+    try {
+      return fs.existsSync(injectorExe()) ? suiteStatusLabel() : '套件文件缺失'
+    } catch { return '未知' }
+  }
+
+  /** 读面板 HTML 并替换占位符；读不到返回 null（apply 时只读这一次） */
+  function manageHtml() {
+    const file = path.join(__dirname, 'ui', 'manage.html')
+    try {
+      return fs.readFileSync(file, 'utf8')
+        .replace(/\{\{VERSION\}\}/g, String(config.version || PLUGIN_VERSION))
+        .replace(/\{\{STATUS\}\}/g, panelStatusText())
+    } catch (err) {
+      ctx.setStatus('面板文件缺失', 'error')
+      log.warn(`${PLUGIN_ID} 读取管理面板失败：${err.message}`)
+      return null
+    }
+  }
+
+  /** 只启动 SAI2。失败抛中文原因——工作台 runAction 会把抛出的 message 回执给面板 */
+  async function launchSai2() {
+    if (typeof ctx.get !== 'function') throw new Error('当前工作台版本不支持启动外部程序，请升级 sai2工作台')
+    let openers
+    try {
+      openers = ctx.get('openers')
+    } catch {
+      // openers 插件被禁用时 ctx.get 会抛 MissingServiceError
+      const text = '启动 SAI2 失败：打开器服务不可用，请在插件中心启用内置的 openers 插件'
+      ctx.setStatus(text, 'warn')
+      throw new Error(text)
+    }
+    let r
+    try {
+      r = await openers.launch(undefined, 'opener-sai2')
+    } catch (err) {
+      const text = '启动 SAI2 失败：' + err.message
+      ctx.setStatus(text, 'warn')
+      throw new Error(text)
+    }
+    if (!r || r.ok !== true) {
+      const text = '启动 SAI2 失败：' + ((r && r.error) || '未知原因')
+      ctx.setStatus(text, 'warn')
+      throw new Error(text)
+    }
+    ctx.setStatus('已启动 SAI2', 'ok')
+    return r
+  }
+
+  /** 一键联动：SAI2 起好之后再开浮窗（浮窗内部会自动注入） */
+  async function launchPair() {
+    await launchSai2()
+    ctx.setStatus('已启动 SAI2，等待就绪…', 'ok')
+    await new Promise((resolve) => setTimeout(resolve, PAIR_DELAY_MS))
+    openWindow()
+  }
+
+  /** 面板上的「连接注入器」 */
+  async function connectInjector() {
+    const r = await ensureInjected()
+    if (!r || !r.ok) throw new Error('连接注入器失败：' + ((r && r.error) || '套件不可用'))
+    if (r.pending) throw new Error('注入器已启动但未连接，请检查白名单与管理员权限')
+    ctx.setStatus(r.already ? '注入器已在线' : '已连接注入器', 'ok')
+    return r
+  }
+
+  function openPluginDir() {
+    if (!ctx.shell || typeof ctx.shell.openFolder !== 'function') {
+      const text = '当前工作台版本不支持打开目录，请升级 sai2工作台'
+      ctx.setStatus(text, 'warn')
+      throw new Error(text)
+    }
+    return ctx.shell.openFolder(__dirname)
+  }
+
   function handleWindowMessage(message) {
     if (!message || !message.type) return
     switch (message.type) {
@@ -620,6 +708,16 @@ function apply(ctx, config) {
   }
 
   // ---- 注册贡献点 ----
+  // 管理面板：html 在此处读一次并注入版本/状态，之后不再读盘
+  const managePage = manageHtml()
+  if (managePage) {
+    if (typeof ctx.addPage === 'function') {
+      ctx.addPage({ id: MANAGE_PAGE_ID, title: 'FX Studio', html: managePage })
+    } else {
+      ctx.setStatus('当前工作台版本不支持插件页面，请升级 sai2工作台', 'warn')
+    }
+  }
+
   ctx.addToolbarAction({
     id: 'suite-open',
     label: 'SAI2 工具面板',
@@ -629,6 +727,33 @@ function apply(ctx, config) {
     id: 'fx-open',
     label: 'FX Studio 轻量版',
     run: () => openWindow()
+  })
+  // 管理面板用的动作：页面按钮发的 id 必须与这里完全一致（tests/manage-panel.test.js 校验）
+  // run 返回 Promise，失败时抛错，工作台才能把 error 回执给面板
+  ctx.addToolbarAction({
+    id: 'fx-launch-pair',
+    label: 'FX：一键开始',
+    run: () => launchPair()
+  })
+  ctx.addToolbarAction({
+    id: 'fx-launch-sai2',
+    label: 'FX：启动 SAI2',
+    run: () => launchSai2()
+  })
+  ctx.addToolbarAction({
+    id: 'fx-open-panel',
+    label: 'FX：打开浮窗',
+    run: () => { openWindow() }
+  })
+  ctx.addToolbarAction({
+    id: 'fx-open-dir',
+    label: 'FX：打开插件目录',
+    run: () => openPluginDir()
+  })
+  ctx.addToolbarAction({
+    id: 'fx-connect',
+    label: 'FX：连接注入器',
+    run: () => connectInjector()
   })
   ctx.addFileAction({
     id: 'fx-open-file',

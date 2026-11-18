@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAI2 FX Studio</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --fg: #1b1f26;
+    --muted: #5c6675;
+    --card: #ffffff;
+    --line: #e3e7ee;
+    --accent: #3b64e8;
+    --accent-fg: #ffffff;
+    --accent-soft: rgba(59, 100, 232, 0.10);
+    --ok: #17794a;
+    --warn: #946000;
+    --err: #b82323;
+    --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 6px 20px rgba(16, 24, 40, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151a;
+      --fg: #e7eaf0;
+      --muted: #98a2b0;
+      --card: #1a1e25;
+      --line: #2a303a;
+      --accent: #7ea0ff;
+      --accent-fg: #0d1220;
+      --accent-soft: rgba(126, 160, 255, 0.14);
+      --ok: #54c78d;
+      --warn: #e3a558;
+      --err: #f27272;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.6 "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 26px 20px 40px; }
+
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+  .head h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.2px; }
+  .head p { margin: 3px 0 0; color: var(--muted); font-size: 13px; }
+  .ver {
+    flex: none; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px;
+    color: var(--muted); font-size: 12px; background: var(--card);
+  }
+
+  .standalone {
+    margin: 0 0 16px; padding: 10px 14px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card); color: var(--muted); font-size: 13px;
+  }
+
+  .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 22px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 14px; box-shadow: var(--shadow);
+  }
+  .card .key { display: block; color: var(--muted); font-size: 12px; letter-spacing: 0.3px; }
+  .card .value { display: block; margin-top: 4px; font-size: 14px; font-weight: 600; word-break: break-all; }
+  .value.ok { color: var(--ok); }
+  .value.warn { color: var(--warn); }
+  .value.err { color: var(--err); }
+
+  h2 { margin: 24px 0 10px; font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0.4px; }
+
+  button {
+    font: inherit; cursor: pointer; border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button:disabled { cursor: default; opacity: 0.6; }
+
+  .primary button {
+    display: block; width: 100%; min-height: 54px; padding: 0 20px;
+    border: 1px solid transparent; background: var(--accent); color: var(--accent-fg);
+    font-size: 16px; font-weight: 600; box-shadow: var(--shadow);
+  }
+  .primary button:hover:not(:disabled) { filter: brightness(1.06); }
+  .primary .hint { margin: 8px 2px 0; color: var(--muted); font-size: 12px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .row button {
+    min-height: 40px; padding: 0 16px; background: var(--card); color: var(--fg);
+    border: 1px solid var(--line); font-size: 13px;
+  }
+  .row button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+
+  .msg { min-height: 22px; margin: 18px 0 0; font-size: 13px; color: var(--muted); }
+  .msg.ok { color: var(--ok); }
+  .msg.warn { color: var(--warn); }
+  .msg.err { color: var(--err); }
+
+  .tips { margin-top: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+  .tips summary { cursor: pointer; padding: 12px 14px; font-size: 13px; font-weight: 600; }
+  .tips ul { margin: 0; padding: 0 18px 14px 32px; color: var(--muted); font-size: 13px; }
+  .tips li { margin: 6px 0; }
+  .tips b { color: var(--fg); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="head">
+    <div>
+      <h1>SAI2 FX Studio</h1>
+      <p>启动 SAI2、打开 FX 浮窗与注入器管理</p>
+    </div>
+    <span class="ver">v{{VERSION}}</span>
+  </header>
+
+  <div class="standalone" id="standalone" hidden>
+    独立预览模式：按钮需要 sai2工作台 的插件页面才能生效，这里只做样式预览。
+  </div>
+
+  <section class="status" aria-label="状态">
+    <div class="card">
+      <span class="key">套件状态</span>
+      <span class="value" id="v-suite">{{STATUS}}</span>
+    </div>
+    <div class="card">
+      <span class="key">注入器</span>
+      <span class="value" id="v-agent">未知</span>
+    </div>
+    <div class="card">
+      <span class="key">浮窗</span>
+      <span class="value" id="v-window">未知</span>
+    </div>
+  </section>
+
+  <section class="primary">
+    <button type="button" data-slot="pair">一键开始（启动 SAI2 + 打开 FX 浮窗）</button>
+    <p class="hint">会先启动 SAI2，等约 1.5 秒让它起好，再打开 FX 浮窗并自动注入。</p>
+  </section>
+
+  <h2>单独操作</h2>
+  <section class="row">
+    <button type="button" data-slot="sai2">只启动 SAI2</button>
+    <button type="button" data-slot="panel">只打开浮窗</button>
+    <button type="button" data-slot="connect">连接注入器</button>
+  </section>
+
+  <h2>管理</h2>
+  <section class="row">
+    <button type="button" data-slot="dir">打开插件目录</button>
+    <button type="button" data-slot="suite">完整工具面板</button>
+  </section>
+
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+
+  <details class="tips">
+    <summary>首次使用提示（点开）</summary>
+    <ul>
+      <li><b>杀软白名单</b>：360 / 火绒等可能拦截注入器，请把插件目录加入信任区，或点浮窗里的「加白名单」。</li>
+      <li><b>管理员权限</b>：SAI2 以管理员启动时，注入也要管理员；完整工具面板可先在配置里勾「以管理员身份启动」。</li>
+      <li><b>SAI2 要先开着</b>：注入器只在 SAI2 运行时有效；「一键开始」只是把 SAI2 拉起来，画作仍需你自己打开。</li>
+      <li>第一次运行建议按顺序试：连接注入器 → 打开浮窗 → 在浮窗里抓取图层。</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+(function () {
+  'use strict'
+
+  // 与 index.js 里 ctx.addToolbarAction 注册的 id 一一对应；改动时两边同步（tests/manage-panel.test.js 会校验）
+  var ACTIONS = [
+    { slot: 'pair',    id: 'fx-launch-pair', label: '一键开始',   busy: '正在启动 SAI2 并打开浮窗…' },
+    { slot: 'sai2',    id: 'fx-launch-sai2', label: '只启动 SAI2', busy: '正在启动 SAI2…' },
+    { slot: 'panel',   id: 'fx-open-panel',  label: '打开浮窗',   busy: '正在打开浮窗…' },
+    { slot: 'connect', id: 'fx-connect',     label: '连接注入器', busy: '正在连接注入器…' },
+    { slot: 'dir',     id: 'fx-open-dir',    label: '打开插件目录', busy: '正在打开插件目录…' },
+    { slot: 'suite',   id: 'suite-open',     label: '完整工具面板', busy: '正在启动完整工具面板…' }
+  ]
+  var TIMEOUT_MS = 20000
+
+  var msgEl = document.getElementById('msg')
+  var cardAgent = document.getElementById('v-agent')
+  var cardWindow = document.getElementById('v-window')
+
+  function setMsg(text, level) {
+    msgEl.textContent = text
+    msgEl.className = 'msg' + (level ? ' ' + level : '')
+  }
+
+  function setCard(el, text, level) {
+    el.textContent = text
+    el.className = 'value' + (level ? ' ' + level : '')
+  }
+
+  function findById(id) {
+    for (var i = 0; i < ACTIONS.length; i += 1) {
+      if (ACTIONS[i].id === id) return ACTIONS[i]
+    }
+    return null
+  }
+
+  function finish(action) {
+    if (action.timer) {
+      window.clearTimeout(action.timer)
+      action.timer = null
+    }
+    action.btn.disabled = false
+    action.btn.textContent = action.text
+  }
+
+  function send(action) {
+    if (action.timer) return // 上一次还没回执，忽略连点
+    if (window.parent === window) {
+      setMsg('独立预览模式：请在 sai2工作台 侧栏的插件页面里使用', 'warn')
+      return
+    }
+    action.btn.disabled = true
+    action.btn.textContent = action.busy
+    setMsg(action.label + '…', '')
+    try {
+      // 页面 → 内核：触发本插件注册的工具栏动作（D-012 动作桥）
+      window.parent.postMessage({ __sai2Page: 'action', id: action.id }, '*')
+    } catch (err) {
+      finish(action)
+      setMsg('无法与工作台通信：' + (err && err.message ? err.message : String(err)), 'err')
+      return
+    }
+    action.timer = window.setTimeout(function () {
+      finish(action)
+      setMsg('「' + action.label + '」超时：工作台没有回执（需要支持插件页面动作的工作台版本）', 'err')
+    }, TIMEOUT_MS)
+  }
+
+  function applyCards(action, ok) {
+    if (action.slot === 'pair') {
+      if (ok) setCard(cardWindow, '已打开', 'ok')
+      else setCard(cardAgent, '启动失败', 'err')
+    } else if (action.slot === 'sai2') {
+      setCard(cardAgent, ok ? '等待连接' : '未启动', ok ? 'warn' : 'err')
+    } else if (action.slot === 'panel') {
+      setCard(cardWindow, ok ? '已打开' : '打开失败', ok ? 'ok' : 'err')
+    } else if (action.slot === 'connect') {
+      setCard(cardAgent, ok ? '已连接' : '连接失败', ok ? 'ok' : 'err')
+    }
+  }
+
+  // 内核 → 页面：{ __sai2Page:'result', id, ok, error? }
+  window.addEventListener('message', function (e) {
+    var m = e.data || {}
+    if (m.__sai2Page !== 'result') return
+    if (e.source && e.source !== window.parent) return
+    var action = findById(String(m.id || ''))
+    if (!action) return
+    finish(action)
+    applyCards(action, m.ok === true)
+    if (m.ok === true) setMsg('「' + action.label + '」已完成', 'ok')
+    else setMsg('「' + action.label + '」失败：' + (m.error || '未知原因'), 'err')
+  })
+
+  for (var i = 0; i < ACTIONS.length; i += 1) {
+    (function (action) {
+      action.btn = document.querySelector('[data-slot="' + action.slot + '"]')
+      if (!action.btn) return
+      action.text = action.btn.textContent
+      action.timer = null
+      action.btn.addEventListener('click', function () { send(action) })
+    })(ACTIONS[i])
+  }
+
+  if (window.parent === window) {
+    document.getElementById('standalone').hidden = false
+  }
+})()
+</script>
+</body>
+</html>
