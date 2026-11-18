@@ -6,7 +6,7 @@
 > 本项目是 sai2工作台 生态下的独立插件项目，位于容器父目录下的 `sai2-fx-studio\`（独立 git 仓库）。
 > 工作台仓库只保留插件 API；本插件的源码、文档、构建与发版全部在这里完成。
 
-为 [sai2工作台](https://github.com/isaysth/sai2-workbench) 提供**原创 UI 层 + 原创 JS 引擎**的 SAI2 图像工具插件，直接对接当前图层。v0.3.0 按原开发方案补齐：四功能页、选区、历史、统计、Lab 取色器、三角色盘、渐变换色、动作、外观设置全部在插件自己的 UI/引擎里实现。
+为 [sai2工作台](https://github.com/isaysth/sai2-workbench) 提供**原创 UI 层 + 原创 JS 引擎**的 SAI2 图像工具插件，直接对接当前图层。v0.3.0 起按原开发方案补齐：四功能页、选区、历史、统计、Lab 取色器、三角色盘、渐变换色、动作、外观设置全部在插件自己的 UI/引擎里实现；v0.4.0 增加侧栏「管理面板」（一键开始 / 独立启动 / 注入器管理）并改用中文显示名。
 
 > ✅ **官方功能插件**：由 sai2工作台 出品并维护，但代码含第三方 MIT 成分——UI 层与核心引擎为原创重写，算法逻辑移植自 MIT 项目 PainterAnkry/sai2-plugin-suite，随包注入套件来自 Celery 的 MIT fork v1.64.0，原样分发、未修改并注明来源。详见 `THIRD-PARTY-NOTICES.md` 与 `LICENSE-UPSTREAM`。
 > 使用前请**备份画作**。注入类工具可能触发杀软告警。
@@ -31,8 +31,8 @@
 
 ## 当前版本与下载
 
-- **版本**：v0.3.0（tag `v0.3.0`）
-- **下载**：https://github.com/isaysth/sai2-fx-studio/releases/tag/v0.3.0
+- **版本**：v0.4.0（本地已构建待发；线上最新 v0.3.0）
+- **下载**：https://github.com/isaysth/sai2-fx-studio/releases
 - **网盘镜像**（国内更快）：https://pan.baidu.com/s/1y2_qD1zGCAg1qLJfIs-BwA?pwd=hos7 （提取码 `hos7`，四个包同一文件夹）
 - **验证状态**：算法断言与冒烟断言均通过；**真机闭环待点验**，清单见 sai2工作台仓库外的 `文档\交付与发布\验证清单\FX真机验证清单.md`
 
@@ -48,7 +48,7 @@
 
 ## 安装（只需一步）
 
-在工作台「插件」页点「安装」→ 选择 `sai2-fx-studio-0.3.0.zip`。
+在工作台「插件」页点「安装」→ 选择 `sai2-fx-studio-0.4.0.zip`。
 （或把 `sai2-fx-studio` 整个目录复制到工作台的 `plugins/` 目录后重启。）
 
 上游注入套件已经在插件包里的 `vendor/sai2-plugin-suite/`，**不用再去下载**。

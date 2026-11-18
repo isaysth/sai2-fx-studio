@@ -27,7 +27,8 @@ const manifest = require('../plugin.json')
 const fs = require('node:fs')
 
 async function main() {
-  assert.equal(manifest.version, '0.3.0', '清单版本应为 0.3.0')
+  // 版本号每升一次都改断言太容易漏，直接跟 package.json 对齐（两边同步 bump）
+  assert.equal(manifest.version, require('../package.json').version, '清单版本应与 package.json 一致')
   for (const key of ['autoPaste', 'fullPanelElevated', 'autoInject']) {
     assert.ok(plugin.configSchema[key], `配置缺少 ${key}`)
   }
@@ -49,7 +50,7 @@ async function main() {
     },
     effect() {}
   }
-  plugin.apply(ctx, { version: '0.3.0', autoInject: false })
+  plugin.apply(ctx, { version: manifest.version, autoInject: false })
 
   const suiteAction = toolbar.find((a) => a.id === 'suite-open')
   const lightAction = toolbar.find((a) => a.id === 'fx-open')
