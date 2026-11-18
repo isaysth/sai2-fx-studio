@@ -4,7 +4,7 @@
   "private": true,
   "description": "SAI2 特效工坊（sai2-fx-studio）- sai2工作台官方功能插件（独立项目）",
   "scripts": {
-    "test": "node tests/core-tools.test.js && node tests/algorithms.test.js && node tests/smoke.js && node tests/manage-panel.test.js && node tests/desktop-command.test.js",
+    "test": "node tests/core-tools.test.js && node tests/algorithms.test.js && node tests/smoke.js && node tests/manage-panel.test.js && node tests/desktop-command.test.js && node tests/panel-ui.test.js",
     "build": "node scripts/build.js"
   }
 }
